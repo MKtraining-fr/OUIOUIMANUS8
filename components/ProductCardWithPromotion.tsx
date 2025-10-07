@@ -1,6 +1,8 @@
 import React from 'react';
 import { Product } from '../types';
 import { formatCurrencyCOP } from '../utils/formatIntegerAmount';
+import PromotionBadge from './promotions/PromotionBadge';
+import useProductPromotions from '../hooks/useProductPromotions';
 
 interface ProductCardWithPromotionProps {
   product: Product;
@@ -8,9 +10,12 @@ interface ProductCardWithPromotionProps {
 }
 
 /**
- * Composant de carte produit simplifié (sans promotions pour déboguer)
+ * Composant de carte produit avec badge promotionnel
  */
 const ProductCardWithPromotion: React.FC<ProductCardWithPromotionProps> = ({ product, onClick }) => {
+  // Récupérer les promotions applicables au produit
+  const { bestPromotion, loading } = useProductPromotions(product);
+
   return (
     <div 
       onClick={() => product.estado === 'disponible' && onClick()}
@@ -18,6 +23,11 @@ const ProductCardWithPromotion: React.FC<ProductCardWithPromotionProps> = ({ pro
         product.estado === 'disponible' ? 'cursor-pointer hover:shadow-xl' : 'opacity-50'
       }`}
     >
+      {/* Afficher le badge promotionnel si une promotion est applicable */}
+      {!loading && bestPromotion && product.estado === 'disponible' && (
+        <PromotionBadge promotion={bestPromotion} />
+      )}
+      
       {/* Image du produit */}
       <img 
         src={product.image} 

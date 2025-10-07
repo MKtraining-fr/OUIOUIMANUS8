@@ -10,6 +10,7 @@ import Cuisine from './pages/Cuisine';
 import ParaLlevar from './pages/ParaLlevar';
 import Ingredients from './pages/Ingredients';
 import Produits from './pages/Produits';
+import Promotions from './pages/Promotions';
 import CommandeClient from './pages/CommandeClient';
 import NotFound from './pages/NotFound';
 import ResumeVentes from './pages/ResumeVentes';
@@ -146,6 +147,14 @@ const AppRoutes: React.FC = () => (
         element={
           <PrivateRoute permissionKey="/produits">
             <Produits />
+          </PrivateRoute>
+        }
+      />
+      <Route
+        path="/promotions"
+        element={
+          <PrivateRoute permissionKey="/promotions">
+            <Promotions />
           </PrivateRoute>
         }
       />

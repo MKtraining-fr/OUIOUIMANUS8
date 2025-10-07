@@ -87,33 +87,3 @@ CREATE TRIGGER calculate_order_total_with_discount_trigger
 BEFORE INSERT OR UPDATE ON orders
 FOR EACH ROW
 EXECUTE FUNCTION calculate_order_total_with_discount();
-
--- Politique de sécurité pour les promotions
-ALTER TABLE promotions ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS promotions_policy ON promotions;
-CREATE POLICY promotions_policy ON promotions
-  USING (true)  -- Tout le monde peut voir les promotions
-  WITH CHECK (
-    auth.uid() IN (
-      SELECT auth.uid() FROM auth.users
-      WHERE auth.email() IN (
-        SELECT email FROM staff_members
-        WHERE role IN ('admin', 'manager')
-      )
-    )
-  );  -- Seuls les admins et managers peuvent modifier les promotions
-
--- Politique de sécurité pour les utilisations de promotions
-ALTER TABLE promotion_usages ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS promotion_usages_policy ON promotion_usages;
-CREATE POLICY promotion_usages_policy ON promotion_usages
-  USING (true)  -- Tout le monde peut voir les utilisations de promotions
-  WITH CHECK (
-    auth.uid() IN (
-      SELECT auth.uid() FROM auth.users
-      WHERE auth.email() IN (
-        SELECT email FROM staff_members
-        WHERE role IN ('admin', 'manager', 'cashier')
-      )
-    )
-  );  -- Seuls les admins, managers et caissiers peuvent enregistrer des utilisations de promotions

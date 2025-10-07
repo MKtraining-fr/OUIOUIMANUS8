@@ -1,0 +1,5 @@
+{
+  "name": "OUIOUITACOS_POS",
+  "description": "A complete Point of Sale (POS) and management system for the OUIOUITACOS restaurant, built with React and a simulated Firebase backend. It includes features for order management, kitchen display, inventory, sales reporting, and a customer-facing order page.",
+  "requestFramePermissions": []
+}

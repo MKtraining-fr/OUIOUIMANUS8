@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" role="img" aria-labelledby="title desc">
+  <title>Restaurant Brand Logo</title>
+  <desc>Stylised plate with cutlery to represent the restaurant brand.</desc>
+  <circle cx="60" cy="60" r="55" fill="#F97316" opacity="0.15" />
+  <circle cx="60" cy="60" r="40" fill="#F97316" />
+  <path d="M60 30c-5 10-5 50 0 60" stroke="#FFFFFF" stroke-width="6" stroke-linecap="round" fill="none" />
+  <path d="M45 45h6v30h-6zM69 45l18 15-18 15z" fill="#FFFFFF" />
+</svg>

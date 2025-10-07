@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>OUIOUITACOS</title>
+    <script>
+      window.tailwind = window.tailwind || {};
+      window.tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              'brand-primary': '#F9A826',
+              'brand-primary-dark': '#DD8C00',
+              'brand-secondary': '#2D2D2D',
+              'brand-accent': '#E63946',
+              'brand-surface': '#FFFFFF',
+              'status-ready': '#2E7D32',
+              'status-cooking': '#F9A826',
+              'status-waiting': '#1976D2',
+              'status-paid': '#388E3C',
+              'status-unpaid': '#D32F2F'
+            }
+          }
+        }
+      };
+    </script>
+    <script src="https://cdn.tailwindcss.com"></script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/index.tsx"></script>
+  </body>
+</html>

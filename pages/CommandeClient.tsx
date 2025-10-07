@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { useRouter } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { Product, Category, OrderItem, Order, ClientInfo } from '../types';
 import { api } from '../services/api';
 import { formatCurrencyCOP } from '../utils/formatIntegerAmount';
@@ -161,12 +161,12 @@ interface ConfirmationModalProps {
 }
 
 const ConfirmationModal: React.FC<ConfirmationModalProps> = ({ isOpen, order, onClose }) => {
-    const router = useRouter();
+    const navigate = useNavigate();
     
     if (!isOpen || !order) return null;
     
     const handleViewOrder = () => {
-        router.navigate(`/order/${order.id}`);
+        navigate(`/order/${order.id}`);
     };
     
     const handleWhatsApp = () => {

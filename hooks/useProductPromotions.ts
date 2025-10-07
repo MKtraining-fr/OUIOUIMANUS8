@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Promotion } from '../types/promotions';
-import { fetchActivePromotions, isPromotionApplicableToOrder } from '../services/promotionsApi';
+import { fetchActivePromotions } from '../services/promotionsApi';
 
 /**
  * Hook pour récupérer les promotions applicables à un produit
@@ -16,11 +16,12 @@ const useProductPromotions = (productId: string) => {
     const fetchPromotions = async () => {
       try {
         setLoading(true);
-        const allActivePromotions = await fetchActivePromotions();
+        // Utiliser un tableau vide par défaut pour éviter les erreurs
+        const allActivePromotions = await fetchActivePromotions().catch(() => []);
         
         // Filtrer les promotions applicables au produit
         const applicablePromotions = allActivePromotions.filter(promotion => {
-          const conditions = promotion.conditions;
+          const conditions = promotion.conditions || {};
           
           // Si la promotion n'a pas de conditions spécifiques aux produits, elle ne s'applique pas directement aux produits
           if (!conditions.product_ids && !conditions.category_ids) {
@@ -42,6 +43,8 @@ const useProductPromotions = (productId: string) => {
         setPromotions(applicablePromotions);
       } catch (err) {
         setError(err instanceof Error ? err : new Error('Une erreur est survenue'));
+        // En cas d'erreur, définir un tableau vide pour éviter les erreurs
+        setPromotions([]);
       } finally {
         setLoading(false);
       }

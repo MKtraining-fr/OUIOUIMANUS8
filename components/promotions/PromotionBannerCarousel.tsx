@@ -18,12 +18,12 @@ const PromotionBannerCarousel: React.FC<PromotionBannerCarouselProps> = ({
   className = '',
   maxBanners = 3,
 }) => {
-  const { promotions, loading, error } = useActiveBannerPromotions();
+  const { promotions = [], loading, error } = useActiveBannerPromotions();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [autoplay, setAutoplay] = useState(true);
   
   // Limiter le nombre de bannières affichées
-  const displayedPromotions = promotions.slice(0, maxBanners);
+  const displayedPromotions = promotions?.slice(0, maxBanners) || [];
   
   // Fonction pour passer à la bannière suivante
   const nextBanner = () => {
@@ -69,10 +69,12 @@ const PromotionBannerCarousel: React.FC<PromotionBannerCarouselProps> = ({
       ) : (
         <>
           {/* Bannière actuelle */}
-          <PromotionBanner 
-            promotion={displayedPromotions[currentIndex]} 
-            onClick={() => onPromotionClick?.(displayedPromotions[currentIndex])}
-          />
+          {displayedPromotions.length > 0 && currentIndex < displayedPromotions.length && (
+            <PromotionBanner 
+              promotion={displayedPromotions[currentIndex]} 
+              onClick={() => onPromotionClick?.(displayedPromotions[currentIndex])}
+            />
+          )}
           
           {/* Boutons de navigation (uniquement si plus d'une bannière) */}
           {displayedPromotions.length > 1 && (

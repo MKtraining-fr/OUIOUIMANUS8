@@ -15,7 +15,8 @@ const useActiveBannerPromotions = () => {
     const fetchPromotions = async () => {
       try {
         setLoading(true);
-        const allActivePromotions = await fetchActivePromotions();
+        // Utiliser un tableau vide par défaut pour éviter les erreurs
+        const allActivePromotions = await fetchActivePromotions().catch(() => []);
         
         // Filtrer les promotions qui ont des bannières définies
         const bannerPromotions = allActivePromotions.filter(promotion => {
@@ -29,6 +30,8 @@ const useActiveBannerPromotions = () => {
         setPromotions(sortedPromotions);
       } catch (err) {
         setError(err instanceof Error ? err : new Error('Une erreur est survenue'));
+        // En cas d'erreur, définir un tableau vide pour éviter les erreurs
+        setPromotions([]);
       } finally {
         setLoading(false);
       }

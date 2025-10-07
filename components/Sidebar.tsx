@@ -4,6 +4,7 @@ import { LogOut, FileText, X } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { NAV_LINKS, SITE_CUSTOMIZER_PERMISSION_KEY } from '../constants';
 import { NotificationCounts } from '../types';
+import { isPermissionGranted } from '../utils/navigation';
 
 interface SidebarProps {
   isOpen: boolean;
@@ -32,7 +33,10 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, notifications, onRep
   const permissions = role?.permissions;
 
   const visibleNavLinks = useMemo(
-    () => NAV_LINKS.filter(link => permissions?.[link.permissionKey] && permissions?.[link.permissionKey] !== 'none'),
+    () => NAV_LINKS.filter(link => {
+      const permission = permissions?.[link.permissionKey];
+      return isPermissionGranted(permission);
+    }),
     [permissions],
   );
 
@@ -197,16 +201,14 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, notifications, onRep
 
           <div className="app-sidebar__section">
             {customizationLink && (
-              <button
-                onClick={() => {
-                  handleNavLinkClick();
-                  navigate(customizationLink.href);
-                }}
-                className="app-sidebar__action"
+              <NavLink
+                to={customizationLink.href}
+                onClick={handleNavLinkClick}
+                className={({ isActive }) => `app-sidebar__action${isActive ? ' is-active' : ''}`}
               >
                 <customizationLink.icon size={22} />
                 <span className="font-semibold">{customizationLink.name}</span>
-              </button>
+              </NavLink>
             )}
             <button
               onClick={() => {

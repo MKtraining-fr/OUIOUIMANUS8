@@ -1,5 +1,3 @@
-
-
 export interface Role {
   id: string;
   name: string;
@@ -329,6 +327,15 @@ export interface Order {
     adresse?: string;
   };
   receipt_url?: string;
+  // Champs pour les promotions
+  subtotal?: number; // Montant avant réduction
+  total_discount?: number; // Montant total des réductions
+  promo_code?: string; // Code promo utilisé
+  applied_promotions?: {
+    promotion_id: string;
+    name: string;
+    discount_amount: number;
+  }[];
 }
 
 export interface KitchenTicket extends Order {
@@ -431,3 +438,6 @@ export interface RoleLogin {
   roleName: string;
   loginAt: string;
 }
+
+// Export des types de promotions
+export * from './promotions';

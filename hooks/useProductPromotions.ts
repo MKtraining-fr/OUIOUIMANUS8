@@ -94,3 +94,5 @@ const useProductPromotions = (product: Product | null) => {
     error 
   };
 };
+
+export default useProductPromotions;

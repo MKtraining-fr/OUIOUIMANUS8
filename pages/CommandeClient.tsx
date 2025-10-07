@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../services/api';
 import { uploadPaymentReceipt } from '../services/cloudinary';
@@ -8,591 +8,739 @@ import { ArrowLeft, ShoppingCart, Plus, Minus, X, Upload, MessageCircle, CheckCi
 import CustomerOrderTracker from '../components/CustomerOrderTracker';
 import { clearActiveCustomerOrder, getActiveCustomerOrder, storeActiveCustomerOrder } from '../services/customerOrderStorage';
 import { formatCurrencyCOP } from '../utils/formatIntegerAmount';
-import useSiteContent from '../hooks/useSiteContent';
-import useCustomFonts from '../hooks/useCustomFonts';
 import { createBackgroundStyle, createHeroBackgroundStyle, createTextStyle } from '../utils/siteStyleHelpers';
-
-// ==================================================================================
-// 2. Item Customization Modal
-// ==================================================================================
-
-interface ItemCustomizationModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  onAddToCart: (item: OrderItem) => void;
-  product: Product;
-  item?: OrderItem;
-}
-
-const ItemCustomizationModal: React.FC<ItemCustomizationModalProps> = ({ isOpen, onClose, onAddToCart, product, item }) => {
-    const [quantity, setQuantity] = useState(1);
-    const [comment, setComment] = useState('');
-
-    useEffect(() => {
-        // Reset modal state when it opens for a new product
-        setQuantity(1);
-        setComment('');
-    }, [isOpen, product]);
-
-    const handleSave = () => {
-        const newItem: OrderItem = {
-            id: item?.id || `oi${Date.now()}`,
-            produitRef: product.id,
-            nom_produit: product.nom_produit,
-            prix_unitaire: product.prix_vente,
-            quantite: quantity,
-            excluded_ingredients: [],
-            commentaire: comment.trim(),
-            estado: 'en_attente',
-        };
-        onAddToCart(newItem);
-    };
-
-    return (
-        <Modal isOpen={isOpen} onClose={onClose} title={product.nom_produit}>
-            <div className="space-y-4">
-                <img src={product.image} alt={product.nom_produit} className="w-full h-48 object-cover rounded-lg" />
-                <p className="text-gray-600">{product.description}</p>
-                <div>
-                    <label className="block text-sm font-medium text-gray-700">Comentario (alergias, etc.)</label>
-                    <textarea value={comment} onChange={e => setComment(e.target.value)} rows={2} className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-brand-primary focus:border-brand-primary text-gray-700 bg-white" />
-                </div>
-                <div className="flex justify-between items-center">
-                    <div className="flex items-center gap-3">
-                        <button onClick={() => setQuantity(q => Math.max(1, q - 1))} className="p-2 rounded-full bg-gray-200 text-gray-800"><Minus size={18}/></button>
-                        <span className="font-bold text-lg w-8 text-center text-gray-800">{quantity}</span>
-                        <button onClick={() => setQuantity(q => q + 1)} className="p-2 rounded-full bg-gray-200 text-gray-800"><Plus size={18}/></button>
-                    </div>
-                    <button onClick={handleSave} className="bg-orange-500 text-white font-bold py-2 px-6 rounded-lg transition hover:bg-orange-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-300">
-                        Añadir ({formatCurrencyCOP(product.prix_vente * quantity)})
-                    </button>
-                </div>
-            </div>
-        </Modal>
-    );
-};
-
-// ==================================================================================
-// Confirmation Modal after submitting order
-// ==================================================================================
-
-interface ConfirmationModalProps {
-    isOpen: boolean;
-    onClose: () => void;
-    order: Order;
-    whatsAppMessage: string;
-}
-const ConfirmationModal: React.FC<ConfirmationModalProps> = ({ isOpen, onClose, order, whatsAppMessage }) => {
-    return (
-        <Modal isOpen={isOpen} onClose={onClose} title="¡Pedido enviado!">
-            <div className="text-center space-y-4">
-                <CheckCircle className="mx-auto text-green-500" size={64}/>
-                <h3 className="text-xl font-bold text-gray-800">¡Gracias por tu pedido!</h3>
-                <p className="text-gray-600">
-                    Tu pedido #{order.id.slice(-6)} se ha recibido correctamente.
-                    Está en espera de validación. Puedes seguir su estado en esta página.
-                </p>
-                <p className="text-gray-600">
-                    Para finalizar, envíanos este resumen por WhatsApp junto con tu comprobante.
-                </p>
-                <a
-                    href={`https://wa.me/?text=${whatsAppMessage}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    onClick={onClose}
-                    className="inline-flex items-center justify-center gap-2 w-full bg-green-500 text-white font-bold py-3 px-4 rounded-lg hover:bg-green-600 transition"
-                >
-                    <MessageCircle /> Enviar por WhatsApp
-                </a>
-            </div>
-        </Modal>
-    );
-};
-
-
-// ==================================================================================
-// 1. Order Menu View
-// ==================================================================================
-
-const DOMICILIO_FEE = 8000;
-const DOMICILIO_ITEM_NAME = 'DOMICILIO';
-// Use empty string instead of 'domicilio_fee' since produit_id will be null for special items
-const DOMICILIO_PRODUCT_REF = '';
-
-const createDeliveryFeeItem = (): OrderItem => ({
-    id: `domicilio-${Date.now()}`,
-    produitRef: DOMICILIO_PRODUCT_REF, // Empty string will be converted to null in API
-    nom_produit: DOMICILIO_ITEM_NAME,
-    prix_unitaire: DOMICILIO_FEE,
-    quantite: 1,
-    excluded_ingredients: [],
-    commentaire: '',
-    estado: 'en_attente',
-});
-
-const isDeliveryFeeItem = (item: OrderItem) =>
-    item.produitRef === DOMICILIO_PRODUCT_REF || item.nom_produit?.toUpperCase() === DOMICILIO_ITEM_NAME;
-
-const OrderMenuView: React.FC<{ onOrderSubmitted: (order: Order) => void }> = ({ onOrderSubmitted }) => {
-    const [products, setProducts] = useState<Product[]>([]);
-    const [categories, setCategories] = useState<Category[]>([]);
-    const [activeCategoryId, setActiveCategoryId] = useState<string>('all');
-    const [cart, setCart] = useState<OrderItem[]>([]);
-    const [isModalOpen, setModalOpen] = useState(false);
-    const [isConfirmOpen, setConfirmOpen] = useState(false);
-    const [selectedProduct, setSelectedProduct] = useState<{product: Product, item?: OrderItem} | null>(null);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
-    const [clientInfo, setClientInfo] = useState({ nom: '', adresse: '', telephone: '' });
-    const [paymentProof, setPaymentProof] = useState<File | null>(null);
-    const [paymentMethod, setPaymentMethod] = useState<Order['payment_method']>('transferencia');
-    const [submitting, setSubmitting] = useState(false);
-    const [submittedOrder, setSubmittedOrder] = useState<Order | null>(null);
-    const [orderHistory, setOrderHistory] = useState<Order[]>([]);
-    const [hasProcessedQueuedReorder, setHasProcessedQueuedReorder] = useState(false);
-
-    useEffect(() => {
-        window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
-    }, []);
-
-    useEffect(() => {
-        try {
-            const historyJSON = localStorage.getItem('customer-order-history');
-            if (historyJSON) {
-                setOrderHistory(JSON.parse(historyJSON));
-            }
-        } catch (e) { console.error("Could not load order history", e); }
-    }, []);
-
-    const fetchData = useCallback(async () => {
-        try {
-            setLoading(true);
-            const [productsData, categoriesData] = await Promise.all([
-                api.getProducts(),
-                api.getCategories(),
-            ]);
-            setProducts(productsData);
-            setCategories(categoriesData);
-        } catch (err) {
-            setError('No fue posible cargar el menú. Intenta nuevamente más tarde.');
-            console.error(err);
-        } finally {
-            setLoading(false);
-        }
-    }, []);
-
-    useEffect(() => {
-        if (loading || products.length === 0) return;
-        if (orderHistory.length === 0 || hasProcessedQueuedReorder) return;
-        const queuedReorderId = localStorage.getItem('customer-order-reorder-id');
-        if (!queuedReorderId) return;
-        const pastOrder = orderHistory.find(order => order.id === queuedReorderId);
-        if (pastOrder) {
-            handleReorder(pastOrder);
-        }
-        localStorage.removeItem('customer-order-reorder-id');
-        setHasProcessedQueuedReorder(true);
-    }, [orderHistory, hasProcessedQueuedReorder, loading, products]);
-
-    useEffect(() => {
-        fetchData();
-    }, [fetchData]);
-
-    const filteredProducts = useMemo(() => {
-        if (activeCategoryId === 'all') return products;
-        return products.filter(p => p.categoria_id === activeCategoryId);
-    }, [products, activeCategoryId]);
-
-    const total = useMemo(() => {
-        const subtotal = cart.reduce((acc, item) => acc + item.quantite * item.prix_unitaire, 0);
-        if (cart.length === 0) {
-            return subtotal;
-        }
-        return subtotal + DOMICILIO_FEE;
-    }, [cart]);
-
-    const handleProductClick = (product: Product) => {
-        setSelectedProduct({product});
-        setModalOpen(true);
-    };
-
-    const handleAddToCart = (item: OrderItem) => {
-        let newCart = [...cart];
-        if (item.commentaire) {
-            newCart.push({ ...item, id: `oi${Date.now()}` });
-        } else {
-            const existingIndex = newCart.findIndex(cartItem => cartItem.produitRef === item.produitRef && !cartItem.commentaire);
-            if (existingIndex > -1) {
-                newCart[existingIndex].quantite += item.quantite;
-            } else {
-                newCart.push(item);
-            }
-        }
-        setCart(newCart);
-        setModalOpen(false);
-    };
-    
-    const handleQuantityChange = (itemId: string, change: number) => {
-        const itemIndex = cart.findIndex(item => item.id === itemId);
-        if (itemIndex === -1) return;
-        
-        let newCart = [...cart];
-        const newQuantity = newCart[itemIndex].quantite + change;
-        if (newQuantity <= 0) {
-            newCart.splice(itemIndex, 1);
-        } else {
-            newCart[itemIndex].quantite = newQuantity;
-        }
-        setCart(newCart);
-    };
-    
-    const handleSubmitOrder = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!clientInfo.nom || !clientInfo.telephone || !clientInfo.adresse || !paymentProof || !paymentMethod) return;
-        setSubmitting(true);
-        try {
-            let receiptUrl: string | undefined;
-            if (paymentProof) {
-                receiptUrl = await uploadPaymentReceipt(paymentProof, {
-                    customerReference: clientInfo.telephone || clientInfo.nom,
-                });
-            }
-
-            const itemsToSubmit = cart.length > 0 ? [...cart, createDeliveryFeeItem()] : cart;
-
-            const orderData = {
-                items: itemsToSubmit,
-                clientInfo,
-                receipt_url: receiptUrl,
-                payment_method: paymentMethod,
-            };
-            const newOrder = await api.submitCustomerOrder(orderData);
-            setSubmittedOrder(newOrder);
-            setConfirmOpen(true);
-            setCart([]);
-            setClientInfo({nom: '', adresse: '', telephone: ''});
-            setPaymentProof(null);
-            setPaymentMethod('transferencia');
-            storeActiveCustomerOrder(newOrder.id);
-        } catch (err) {
-            alert('Ocurrió un error al enviar el pedido o subir el comprobante.');
-            console.error(err);
-        } finally {
-            setSubmitting(false);
-        }
-    };
-
-    const handleReorder = (pastOrder: Order) => {
-        const timestamp = Date.now();
-        const missingProducts: string[] = [];
-
-        const updatedItems = pastOrder.items.reduce<OrderItem[]>((acc, item, index) => {
-            if (isDeliveryFeeItem(item)) {
-                return acc;
-            }
-
-            const product = products.find(p => p.id === item.produitRef);
-
-            if (!product) {
-                missingProducts.push(item.nom_produit || item.produitRef);
-                return acc;
-            }
-
-            acc.push({
-                ...item,
-                id: `oi${timestamp}-${index}`,
-                produitRef: product.id,
-                nom_produit: product.nom_produit,
-                prix_unitaire: product.prix_vente,
-            });
-
-            return acc;
-        }, []);
-
-        setCart(updatedItems);
-
-        if (missingProducts.length > 0) {
-            alert(`Algunos artículos ya no están disponibles y no se agregaron:\n- ${missingProducts.join('\n- ')}`);
-        }
-
-        const cartElement = document.getElementById('cart-section');
-        if(cartElement) {
-             cartElement.scrollIntoView({ behavior: 'smooth' });
-        }
-    };
-    
-    const generateWhatsAppMessage = (order: Order) => {
-        const header = `*Nuevo pedido OUIOUITACOS #${order.id.slice(-6)}*`;
-        const itemLines = (order.items ?? []).map(item => {
-            const baseLine = `- ${item.quantite}x ${item.nom_produit} (${formatCurrencyCOP(item.prix_unitaire)}) → ${formatCurrencyCOP(item.prix_unitaire * item.quantite)}`;
-            const details: string[] = [];
-            if (item.commentaire) {
-                details.push(`Comentario: ${item.commentaire}`);
-            }
-            if (item.excluded_ingredients && item.excluded_ingredients.length > 0) {
-                details.push(`Sin: ${item.excluded_ingredients.join(', ')}`);
-            }
-            return details.length > 0 ? `${baseLine}\n  ${details.join('\n  ')}` : baseLine;
-        });
-        const items = itemLines.length > 0 ? itemLines.join('\n') : 'Sin artículos';
-        const totalValue = order.total ?? order.items.reduce((sum, item) => sum + item.prix_unitaire * item.quantite, 0);
-        const totalMsg = `*Total: ${formatCurrencyCOP(totalValue)}*`;
-        const paymentMethod = order.payment_method ? `Pago: ${order.payment_method}` : undefined;
-        const client = `Cliente: ${order.clientInfo?.nom} (${order.clientInfo?.telephone})\nDirección: ${order.clientInfo?.adresse}`;
-        const footer = 'Comprobante de pago adjunto.';
-        const messageParts = [header, items, totalMsg, paymentMethod, client, footer].filter(Boolean);
-        return encodeURIComponent(messageParts.join('\n\n'));
-    };
-
-    if (loading) return <div className="h-screen flex items-center justify-center">Cargando el menú...</div>;
-    if (error) return <div className="h-screen flex items-center justify-center text-red-500">{error}</div>;
-
-    return (
-        <>
-            <main className="container mx-auto p-4 lg:grid lg:grid-cols-3 lg:gap-8">
-                {/* Menu Section */}
-                <div className="lg:col-span-2">
-                    {orderHistory.length > 0 && cart.length === 0 && (
-                        <div className="bg-white/95 p-4 rounded-xl shadow-xl mb-8">
-                            <h2 className="text-xl font-bold flex items-center gap-2 mb-3 text-gray-700"><History /> ¿Repetir un pedido?</h2>
-                            <div className="space-y-2">
-                                {orderHistory.slice(0, 3).map(order => (
-                                    <div
-                                        key={order.id}
-                                        className="flex justify-between items-center rounded-lg border border-white/20 bg-slate-900/80 p-3 text-slate-100 backdrop-blur-sm"
-                                    >
-                                        <div>
-                                            <p className="font-semibold text-white">Pedido del {new Date(order.date_creation).toLocaleDateString('es-CO')}</p>
-                                            <p className="text-sm text-slate-300">{order.items.length} artículo(s) - {formatCurrencyCOP(order.total)}</p>
-                                        </div>
-                                        <button
-                                            onClick={() => handleReorder(order)}
-                                            className="bg-orange-500 text-white font-semibold py-2 px-4 rounded-lg text-base transition hover:bg-orange-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-300"
-                                        >
-                                            Pedir de nuevo
-                                        </button>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    )}
-                    <div className="bg-white/95 p-4 rounded-xl shadow-xl">
-                        <div className="flex space-x-2 overflow-x-auto pb-2 mb-4">
-                            <button
-                                onClick={() => setActiveCategoryId('all')}
-                                className={`px-4 py-2 rounded-full font-semibold whitespace-nowrap transition border ${activeCategoryId === 'all' ? 'bg-brand-primary text-slate-900 border-brand-primary shadow-lg' : 'bg-slate-900/80 text-white border-white/20'}`}
-                            >
-                                Todos
-                            </button>
-                            {categories.map(cat => (
-                                <button
-                                    key={cat.id}
-                                    onClick={() => setActiveCategoryId(cat.id)}
-                                    className={`px-4 py-2 rounded-full font-semibold whitespace-nowrap transition border ${activeCategoryId === cat.id ? 'bg-brand-primary text-slate-900 border-brand-primary shadow-lg' : 'bg-slate-900/80 text-white border-white/20'}`}
-                                >
-                                    {cat.nom}
-                                </button>
-                            ))}
-                        </div>
-                        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-                            {filteredProducts.map(product => (
-                                <div key={product.id} onClick={() => product.estado === 'disponible' && handleProductClick(product)}
-                                    className={`border rounded-2xl p-6 flex flex-col items-center text-center transition-shadow bg-white/90 shadow-md ${product.estado === 'disponible' ? 'cursor-pointer hover:shadow-xl' : 'opacity-50'}`}>
-                                    <img src={product.image} alt={product.nom_produit} className="w-36 h-36 md:w-40 md:h-40 object-cover rounded-xl mb-4" />
-                                    <p className="font-semibold text-lg flex-grow text-gray-800">{product.nom_produit}</p>
-                                    <p className="text-base text-gray-600 mt-2 px-1 max-h-20 overflow-hidden">{product.description}</p>
-                                    <p className="font-bold text-2xl text-gray-800 mt-3">{formatCurrencyCOP(product.prix_vente)}</p>
-                                    {product.estado !== 'disponible' && <span className="text-xs text-red-500 font-bold mt-1">Agotado</span>}
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                </div>
-
-                {/* Cart Section */}
-                <div id="cart-section" className="lg:col-span-1 mt-8 lg:mt-0 lg:sticky top-24 self-start">
-                    <div className="bg-white/95 p-4 rounded-xl shadow-xl">
-                        <h2 className="text-2xl font-bold flex items-center gap-2 mb-4 text-gray-700"><ShoppingCart/> Mi carrito</h2>
-                        {cart.length === 0 ? <p className="text-gray-500">Tu carrito está vacío.</p> :
-                            <div className="space-y-3">
-                                {cart.map(item => (
-                                    <div key={item.id} className="flex justify-between items-start">
-                                        <div>
-                                            <p className="font-semibold text-gray-700">{item.nom_produit}</p>
-                                            {item.commentaire && <p className="text-xs text-gray-500 italic">"{item.commentaire}"</p>}
-                                            <p className="text-sm text-gray-600 font-semibold">{formatCurrencyCOP(item.prix_unitaire * item.quantite)}</p>
-                                        </div>
-                                        <div className="flex items-center gap-2">
-                                            <button onClick={() => handleQuantityChange(item.id, -1)} className="p-1 rounded-full bg-gray-200"><Minus size={14}/></button>
-                                            <span className="font-bold w-5 text-center text-gray-700">{item.quantite}</span>
-                                            <button onClick={() => handleQuantityChange(item.id, 1)} className="p-1 rounded-full bg-gray-200"><Plus size={14}/></button>
-                                        </div>
-                                    </div>
-                                ))}
-                                <div key="delivery-fee" className="flex justify-between items-start border-t pt-3">
-                                    <div>
-                                        <p className="font-semibold text-gray-700">{DOMICILIO_ITEM_NAME}</p>
-                                        <p className="text-sm text-gray-600 font-semibold">{formatCurrencyCOP(DOMICILIO_FEE)}</p>
-                                    </div>
-                                </div>
-                            </div>
-                        }
-                        <div className="border-t my-4"></div>
-                        <div className="flex justify-between text-xl font-bold text-gray-700">
-                            <span>Total</span>
-                            <span>{formatCurrencyCOP(total)}</span>
-                        </div>
-
-                        {cart.length > 0 && (
-                            <form onSubmit={handleSubmitOrder} className="mt-6 space-y-4">
-                                <div>
-                                    <label className="text-sm font-medium text-gray-700">Nombre completo</label>
-                                    <input type="text" required value={clientInfo.nom} onChange={e => setClientInfo({...clientInfo, nom: e.target.value})} className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-brand-primary focus:border-brand-primary text-gray-700 bg-white"/>
-                                </div>
-                                <div>
-                                    <label className="text-sm font-medium text-gray-700">Dirección de entrega</label>
-                                    <input type="text" required value={clientInfo.adresse} onChange={e => setClientInfo({...clientInfo, adresse: e.target.value})} className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-brand-primary focus:border-brand-primary text-gray-700 bg-white"/>
-                                </div>
-                                <div>
-                                    <label className="text-sm font-medium text-gray-700">Número de teléfono</label>
-                                    <input type="tel" required value={clientInfo.telephone} onChange={e => setClientInfo({...clientInfo, telephone: e.target.value})} className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-brand-primary focus:border-brand-primary text-gray-700 bg-white"/>
-                                </div>
-                                <div>
-                                    <label className="text-sm font-medium text-gray-700">Método de pago</label>
-                                    <select
-                                        required
-                                        value={paymentMethod}
-                                        onChange={e => setPaymentMethod(e.target.value as Order['payment_method'])}
-                                        className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-brand-primary focus:border-brand-primary bg-white text-gray-700"
-                                    >
-                                        <option value="transferencia">Transferencia</option>
-                                        <option value="efectivo" disabled>Efectivo - no disponible</option>
-                                    </select>
-                                </div>
-                                <div className="text-sm font-semibold text-gray-700">Numero Nequi/BRE-B : 3238090562</div>
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700">Comprobante de transferencia</label>
-                                    <label htmlFor="payment-proof-upload" className="mt-1 w-full border border-gray-300 p-2 rounded-md shadow-sm flex items-center gap-2 cursor-pointer bg-white text-gray-500">
-                                        <Upload size={18} />
-                                        <span>{paymentProof ? paymentProof.name : 'Selecciona un archivo...'}</span>
-                                    </label>
-                                    <input id="payment-proof-upload" type="file" required accept="image/*,.pdf" onChange={e => setPaymentProof(e.target.files ? e.target.files[0] : null)} className="hidden" />
-                                </div>
-                                <button type="submit" disabled={!clientInfo.nom || !clientInfo.telephone || !clientInfo.adresse || !paymentProof || !paymentMethod || submitting} className="w-full bg-brand-accent text-white font-bold py-3 rounded-lg text-lg hover:bg-red-700 transition disabled:bg-gray-400">
-                                    {submitting ? 'Enviando...' : `Enviar el pedido (${formatCurrencyCOP(total)})`}
-                                </button>
-                            </form>
-                        )}
-                    </div>
-                </div>
-            </main>
-
-            {selectedProduct && (
-                <ItemCustomizationModal 
-                    isOpen={isModalOpen}
-                    onClose={() => setModalOpen(false)}
-                    onAddToCart={handleAddToCart}
-                    product={selectedProduct.product}
-                    item={selectedProduct.item}
-                />
-            )}
-            
-            {submittedOrder && (
-                <ConfirmationModal
-                    isOpen={isConfirmOpen}
-                    onClose={() => {
-                        onOrderSubmitted(submittedOrder);
-                        setConfirmOpen(false);
-                    }}
-                    order={submittedOrder}
-                    whatsAppMessage={generateWhatsAppMessage(submittedOrder)}
-                />
-            )}
-        </>
-    );
-};
-
-
-// ==================================================================================
-// 3. Main Component
-// ==================================================================================
+import useSiteContent from '../hooks/useSiteContent';
 
 const CommandeClient: React.FC = () => {
-    const navigate = useNavigate();
-    const [activeOrder, setActiveOrder] = useState(() => getActiveCustomerOrder());
-    const activeOrderId = activeOrder?.orderId ?? null;
-    const { content: siteContent, loading: siteContentLoading } = useSiteContent();
-    const [content, setContent] = useState<SiteContent | null>(() => siteContent);
+  const navigate = useNavigate();
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [cart, setCart] = useState<OrderItem[]>([]);
+  const [isCartOpen, setIsCartOpen] = useState(false);
+  const [isOrderModalOpen, setIsOrderModalOpen] = useState(false);
+  const [customerName, setCustomerName] = useState('');
+  const [customerPhone, setCustomerPhone] = useState('');
+  const [customerEmail, setCustomerEmail] = useState('');
+  const [customerAddress, setCustomerAddress] = useState('');
+  const [paymentMethod, setPaymentMethod] = useState<'cash' | 'transfer'>('cash');
+  const [paymentReceipt, setPaymentReceipt] = useState<File | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [orderSuccess, setOrderSuccess] = useState(false);
+  const [orderNumber, setOrderNumber] = useState<string | null>(null);
+  const [isTrackerOpen, setIsTrackerOpen] = useState(false);
+  const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
+  const [orderHistory, setOrderHistory] = useState<Order[]>([]);
+  const [selectedHistoryOrder, setSelectedHistoryOrder] = useState<Order | null>(null);
+  const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const { content, loading: contentLoading } = useSiteContent();
 
-    useEffect(() => {
-        if (siteContent) {
-            setContent(siteContent);
+  // Load products and categories
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const [categoriesData, productsData] = await Promise.all([
+          api.getCategories(),
+          api.getProducts(),
+        ]);
+        setCategories(categoriesData);
+        setProducts(productsData.filter(product => product.estado === 'disponible'));
+        
+        // Set first category as selected
+        if (categoriesData.length > 0) {
+          setSelectedCategory(categoriesData[0].id);
         }
-    }, [siteContent]);
+      } catch (error) {
+        console.error('Error fetching data:', error);
+      }
+    };
+    
+    fetchData();
+  }, []);
 
-    const assetsLibrary = content?.assets.library ?? [];
-    useCustomFonts(assetsLibrary);
-
-    if (!content) {
-        return (
-            <div className="flex min-h-screen items-center justify-center bg-slate-50">
-                <p className="text-sm text-slate-500">
-                    {siteContentLoading ? 'Chargement du contenu du site…' : 'Initialisation du contenu du site…'}
-                </p>
-            </div>
-        );
+  // Load cart from local storage
+  useEffect(() => {
+    const savedCart = getActiveCustomerOrder();
+    if (savedCart) {
+      setCart(savedCart);
     }
+  }, []);
 
-    const { hero, navigation, assets } = content;
-    const brandLogo = navigation.brandLogo ?? '/logo-brand.svg';
+  // Save cart to local storage whenever it changes
+  useEffect(() => {
+    storeActiveCustomerOrder(cart);
+  }, [cart]);
 
+  const handleAddToCart = (product: Product) => {
+    setCart(prevCart => {
+      const existingItem = prevCart.find(item => item.product_id === product.id);
+      
+      if (existingItem) {
+        return prevCart.map(item => 
+          item.product_id === product.id 
+            ? { ...item, quantity: item.quantity + 1 } 
+            : item
+        );
+      } else {
+        return [...prevCart, { 
+          product_id: product.id, 
+          product_name: product.nom_produit,
+          product_price: product.prix_vente,
+          quantity: 1,
+          notes: ''
+        }];
+      }
+    });
+    
+    setIsCartOpen(true);
+  };
 
-    const heroBackgroundStyle = createHeroBackgroundStyle(hero.style, hero.backgroundImage);
-    const navigationBackgroundStyle = createBackgroundStyle(navigation.style);
-    const navigationTextStyle = createTextStyle(navigation.style);
+  const handleRemoveFromCart = (productId: string) => {
+    setCart(prevCart => prevCart.filter(item => item.product_id !== productId));
+  };
 
-    const handleOrderSubmitted = (order: Order) => {
-        storeActiveCustomerOrder(order.id);
-        setActiveOrder({ orderId: order.id });
-    };
-
-    const handleNewOrder = () => {
-        clearActiveCustomerOrder();
-        setActiveOrder(null);
-    };
-
-    return (
-        <div style={heroBackgroundStyle} className="min-h-screen text-slate-100">
-            <header
-                className="shadow-md backdrop-blur p-4 sticky top-0 z-40 border-b border-white/40"
-                style={navigationBackgroundStyle}
-            >
-                <div className="container mx-auto flex justify-between items-center" style={navigationTextStyle}>
-                    <div className="flex items-center gap-3">
-                        <img
-                            src={brandLogo}
-                            alt={`Logo ${navigation.brand}`}
-                            className="h-10 w-10 rounded-full object-cover border border-white/30 bg-white/10"
-                        />
-                        <span className="text-2xl font-bold">{navigation.brand}</span>
-                    </div>
-                    <button
-                        onClick={() => navigate('/')}
-                        className="flex items-center gap-2 text-sm font-medium transition hover:opacity-80"
-                        style={navigationTextStyle}
-                    >
-                        <ArrowLeft size={16}/> Volver al inicio
-                    </button>
-                </div>
-            </header>
-
-            {activeOrderId ? (
-                <CustomerOrderTracker orderId={activeOrderId} onNewOrderClick={handleNewOrder} variant="page" />
-            ) : (
-                <OrderMenuView onOrderSubmitted={handleOrderSubmitted} />
-            )}
-        </div>
+  const handleUpdateQuantity = (productId: string, newQuantity: number) => {
+    if (newQuantity < 1) {
+      handleRemoveFromCart(productId);
+      return;
+    }
+    
+    setCart(prevCart => 
+      prevCart.map(item => 
+        item.product_id === productId 
+          ? { ...item, quantity: newQuantity } 
+          : item
+      )
     );
+  };
+
+  const handleUpdateNotes = (productId: string, notes: string) => {
+    setCart(prevCart => 
+      prevCart.map(item => 
+        item.product_id === productId 
+          ? { ...item, notes } 
+          : item
+      )
+    );
+  };
+
+  const calculateTotal = () => {
+    return cart.reduce((total, item) => total + (item.product_price * item.quantity), 0);
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      setPaymentReceipt(e.target.files[0]);
+    }
+  };
+
+  const handleSubmitOrder = async () => {
+    if (cart.length === 0) return;
+    
+    setIsSubmitting(true);
+    
+    try {
+      let receiptUrl = '';
+      
+      if (paymentMethod === 'transfer' && paymentReceipt) {
+        receiptUrl = await uploadPaymentReceipt(paymentReceipt);
+      }
+      
+      const orderData = {
+        customer_name: customerName,
+        customer_phone: customerPhone,
+        customer_email: customerEmail,
+        customer_address: customerAddress,
+        payment_method: paymentMethod,
+        payment_receipt_url: receiptUrl,
+        items: cart,
+        total: calculateTotal(),
+        status: 'pending',
+        order_type: 'delivery'
+      };
+      
+      const order = await api.createOrder(orderData);
+      setOrderNumber(order.order_number);
+      setOrderSuccess(true);
+      clearActiveCustomerOrder();
+      setCart([]);
+    } catch (error) {
+      console.error('Error submitting order:', error);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleOpenHistory = async () => {
+    try {
+      if (customerPhone) {
+        const history = await api.getOrdersByPhone(customerPhone);
+        setOrderHistory(history);
+        setIsHistoryModalOpen(true);
+      }
+    } catch (error) {
+      console.error('Error fetching order history:', error);
+    }
+  };
+
+  const handleViewOrderDetails = (order: Order) => {
+    setSelectedHistoryOrder(order);
+    setIsDetailsModalOpen(true);
+  };
+
+  const filteredProducts = selectedCategory 
+    ? products.filter(product => product.category_id === selectedCategory)
+    : products;
+
+  const getProductById = (id: string) => {
+    return products.find(product => product.id === id);
+  };
+
+  const renderHero = () => {
+    if (contentLoading || !content) return null;
+    
+    const heroContent = content.hero_content;
+    const heroStyle = createHeroBackgroundStyle(content);
+    
+    return (
+      <div className="relative w-full h-64 md:h-80 mb-8 rounded-xl overflow-hidden" style={heroStyle}>
+        <div className="absolute inset-0 bg-black/40 flex flex-col justify-center items-center text-center p-6">
+          <h1 className="text-4xl md:text-5xl font-bold text-white mb-4" style={createTextStyle(content)}>
+            {heroContent?.title || "Commandez en ligne"}
+          </h1>
+          <p className="text-xl text-white max-w-2xl">
+            {heroContent?.subtitle || "Découvrez nos délicieux tacos et commandez directement en ligne"}
+          </p>
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <div className="min-h-screen" style={createBackgroundStyle(content)}>
+      <div className="container mx-auto px-4 py-8">
+        {renderHero()}
+        
+        <div className="flex flex-col md:flex-row gap-8">
+          {/* Main content */}
+          <div className="flex-1">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-2xl font-bold">Notre Menu</h2>
+              <div className="flex gap-2">
+                <button 
+                  onClick={() => navigate('/')}
+                  className="flex items-center gap-1 px-3 py-1 rounded-lg bg-gray-100 hover:bg-gray-200 transition"
+                >
+                  <ArrowLeft size={16} />
+                  <span>Retour</span>
+                </button>
+                
+                <button 
+                  onClick={() => setIsCartOpen(true)}
+                  className="flex items-center gap-1 px-3 py-1 rounded-lg bg-orange-500 text-white hover:bg-orange-600 transition relative"
+                >
+                  <ShoppingCart size={16} />
+                  <span>Panier</span>
+                  {cart.length > 0 && (
+                    <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs w-5 h-5 flex items-center justify-center rounded-full">
+                      {cart.reduce((total, item) => total + item.quantity, 0)}
+                    </span>
+                  )}
+                </button>
+              </div>
+            </div>
+            
+            {/* Categories */}
+            <div className="flex gap-2 overflow-x-auto pb-2 mb-6">
+              {categories.map(category => (
+                <button
+                  key={category.id}
+                  onClick={() => setSelectedCategory(category.id)}
+                  className={`px-4 py-2 rounded-full whitespace-nowrap ${
+                    selectedCategory === category.id
+                      ? 'bg-orange-500 text-white'
+                      : 'bg-gray-100 hover:bg-gray-200'
+                  }`}
+                >
+                  {category.name}
+                </button>
+              ))}
+            </div>
+            
+            {/* Products */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              {filteredProducts.map(product => (
+                <div 
+                  key={product.id}
+                  onClick={() => handleAddToCart(product)}
+                  className="border rounded-2xl p-6 flex flex-col items-center text-center cursor-pointer transition-shadow hover:shadow-xl bg-white/90"
+                >
+                  <img 
+                    src={product.image} 
+                    alt={product.nom_produit} 
+                    className="w-36 h-36 md:w-40 md:h-40 object-cover rounded-xl mb-4" 
+                  />
+                  <p className="font-semibold text-lg flex-grow">{product.nom_produit}</p>
+                  <p className="text-base text-gray-600 mt-2 px-1 max-h-20 overflow-hidden">
+                    {product.description}
+                  </p>
+                  <p className="font-bold text-2xl mt-3">
+                    {formatCurrencyCOP(product.prix_vente)}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+          
+          {/* Cart sidebar for desktop */}
+          <div className="hidden md:block w-96 bg-white rounded-xl p-6 shadow-lg h-fit sticky top-8">
+            <h3 className="text-xl font-bold mb-4">Votre Commande</h3>
+            
+            {cart.length === 0 ? (
+              <p className="text-gray-500 text-center py-8">Tu carrito está vacío</p>
+            ) : (
+              <>
+                <div className="space-y-4 mb-6">
+                  {cart.map(item => {
+                    const product = getProductById(item.product_id);
+                    return (
+                      <div key={item.product_id} className="flex gap-3">
+                        {product && (
+                          <img 
+                            src={product.image} 
+                            alt={item.product_name} 
+                            className="w-16 h-16 object-cover rounded-lg" 
+                          />
+                        )}
+                        <div className="flex-1">
+                          <div className="flex justify-between">
+                            <p className="font-medium">{item.product_name}</p>
+                            <button 
+                              onClick={() => handleRemoveFromCart(item.product_id)}
+                              className="text-gray-400 hover:text-red-500"
+                            >
+                              <X size={16} />
+                            </button>
+                          </div>
+                          <p className="text-gray-500">{formatCurrencyCOP(item.product_price)}</p>
+                          <div className="flex items-center gap-2 mt-1">
+                            <button 
+                              onClick={() => handleUpdateQuantity(item.product_id, item.quantity - 1)}
+                              className="p-1 rounded-full bg-gray-100 hover:bg-gray-200"
+                            >
+                              <Minus size={14} />
+                            </button>
+                            <span>{item.quantity}</span>
+                            <button 
+                              onClick={() => handleUpdateQuantity(item.product_id, item.quantity + 1)}
+                              className="p-1 rounded-full bg-gray-100 hover:bg-gray-200"
+                            >
+                              <Plus size={14} />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+                
+                <div className="border-t pt-4">
+                  <div className="flex justify-between font-bold text-lg">
+                    <span>Total:</span>
+                    <span>{formatCurrencyCOP(calculateTotal())}</span>
+                  </div>
+                </div>
+                
+                <button 
+                  onClick={() => setIsOrderModalOpen(true)}
+                  className="w-full py-3 mt-6 bg-orange-500 text-white rounded-lg font-bold hover:bg-orange-600 transition"
+                >
+                  Finalizar Pedido
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+      
+      {/* Mobile cart modal */}
+      <Modal isOpen={isCartOpen} onClose={() => setIsCartOpen(false)} title="Tu Carrito">
+        {cart.length === 0 ? (
+          <p className="text-gray-500 text-center py-8">Tu carrito está vacío</p>
+        ) : (
+          <>
+            <div className="space-y-4 mb-6">
+              {cart.map(item => {
+                const product = getProductById(item.product_id);
+                return (
+                  <div key={item.product_id} className="flex gap-3">
+                    {product && (
+                      <img 
+                        src={product.image} 
+                        alt={item.product_name} 
+                        className="w-16 h-16 object-cover rounded-lg" 
+                      />
+                    )}
+                    <div className="flex-1">
+                      <div className="flex justify-between">
+                        <p className="font-medium">{item.product_name}</p>
+                        <button 
+                          onClick={() => handleRemoveFromCart(item.product_id)}
+                          className="text-gray-400 hover:text-red-500"
+                        >
+                          <X size={16} />
+                        </button>
+                      </div>
+                      <p className="text-gray-500">{formatCurrencyCOP(item.product_price)}</p>
+                      <div className="flex items-center gap-2 mt-1">
+                        <button 
+                          onClick={() => handleUpdateQuantity(item.product_id, item.quantity - 1)}
+                          className="p-1 rounded-full bg-gray-100 hover:bg-gray-200"
+                        >
+                          <Minus size={14} />
+                        </button>
+                        <span>{item.quantity}</span>
+                        <button 
+                          onClick={() => handleUpdateQuantity(item.product_id, item.quantity + 1)}
+                          className="p-1 rounded-full bg-gray-100 hover:bg-gray-200"
+                        >
+                          <Plus size={14} />
+                        </button>
+                      </div>
+                      <input
+                        type="text"
+                        placeholder="Notas especiales"
+                        value={item.notes || ''}
+                        onChange={(e) => handleUpdateNotes(item.product_id, e.target.value)}
+                        className="mt-2 w-full px-2 py-1 text-sm border rounded"
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            
+            <div className="border-t pt-4">
+              <div className="flex justify-between font-bold text-lg">
+                <span>Total:</span>
+                <span>{formatCurrencyCOP(calculateTotal())}</span>
+              </div>
+            </div>
+            
+            <button 
+              onClick={() => {
+                setIsCartOpen(false);
+                setIsOrderModalOpen(true);
+              }}
+              className="w-full py-3 mt-6 bg-orange-500 text-white rounded-lg font-bold hover:bg-orange-600 transition"
+            >
+              Finalizar Pedido
+            </button>
+          </>
+        )}
+      </Modal>
+      
+      {/* Order form modal */}
+      <Modal 
+        isOpen={isOrderModalOpen} 
+        onClose={() => !isSubmitting && setIsOrderModalOpen(false)} 
+        title={orderSuccess ? "¡Pedido Confirmado!" : "Finalizar Pedido"}
+      >
+        {orderSuccess ? (
+          <div className="text-center py-6">
+            <div className="w-16 h-16 mx-auto bg-green-100 rounded-full flex items-center justify-center mb-4">
+              <CheckCircle size={32} className="text-green-500" />
+            </div>
+            <h3 className="text-xl font-bold mb-2">¡Gracias por tu pedido!</h3>
+            <p className="mb-4">Tu número de pedido es: <span className="font-bold">{orderNumber}</span></p>
+            <p className="text-gray-600 mb-6">Te enviaremos actualizaciones sobre tu pedido por mensaje de texto.</p>
+            <div className="flex gap-4 justify-center">
+              <button
+                onClick={() => {
+                  setIsOrderModalOpen(false);
+                  setOrderSuccess(false);
+                }}
+                className="px-4 py-2 bg-gray-100 rounded-lg hover:bg-gray-200 transition"
+              >
+                Cerrar
+              </button>
+              <button
+                onClick={() => {
+                  setIsOrderModalOpen(false);
+                  setOrderSuccess(false);
+                  setIsTrackerOpen(true);
+                }}
+                className="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition"
+              >
+                Seguir mi pedido
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Nombre</label>
+                <input
+                  type="text"
+                  value={customerName}
+                  onChange={(e) => setCustomerName(e.target.value)}
+                  className="w-full px-3 py-2 border rounded-lg"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Teléfono</label>
+                <input
+                  type="tel"
+                  value={customerPhone}
+                  onChange={(e) => setCustomerPhone(e.target.value)}
+                  className="w-full px-3 py-2 border rounded-lg"
+                  required
+                />
+              </div>
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+              <input
+                type="email"
+                value={customerEmail}
+                onChange={(e) => setCustomerEmail(e.target.value)}
+                className="w-full px-3 py-2 border rounded-lg"
+              />
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Dirección de entrega</label>
+              <input
+                type="text"
+                value={customerAddress}
+                onChange={(e) => setCustomerAddress(e.target.value)}
+                className="w-full px-3 py-2 border rounded-lg"
+                required
+              />
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Método de pago</label>
+              <div className="flex gap-4">
+                <label className="flex items-center gap-2">
+                  <input
+                    type="radio"
+                    checked={paymentMethod === 'cash'}
+                    onChange={() => setPaymentMethod('cash')}
+                  />
+                  <span>Efectivo</span>
+                </label>
+                <label className="flex items-center gap-2">
+                  <input
+                    type="radio"
+                    checked={paymentMethod === 'transfer'}
+                    onChange={() => setPaymentMethod('transfer')}
+                  />
+                  <span>Transferencia</span>
+                </label>
+              </div>
+            </div>
+            
+            {paymentMethod === 'transfer' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Comprobante de pago</label>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    className="px-3 py-2 bg-gray-100 rounded-lg hover:bg-gray-200 flex items-center gap-2"
+                  >
+                    <Upload size={16} />
+                    <span>{paymentReceipt ? paymentReceipt.name : 'Subir comprobante'}</span>
+                  </button>
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    onChange={handleFileChange}
+                    accept="image/*"
+                    className="hidden"
+                  />
+                </div>
+              </div>
+            )}
+            
+            <div className="border-t pt-4 mt-4">
+              <div className="flex justify-between font-bold text-lg">
+                <span>Total:</span>
+                <span>{formatCurrencyCOP(calculateTotal())}</span>
+              </div>
+            </div>
+            
+            <div className="flex justify-between pt-4">
+              {customerPhone && (
+                <button
+                  onClick={handleOpenHistory}
+                  className="flex items-center gap-1 px-3 py-2 bg-gray-100 rounded-lg hover:bg-gray-200 transition"
+                >
+                  <History size={16} />
+                  <span>Mis pedidos</span>
+                </button>
+              )}
+              
+              <div className="flex gap-2 ml-auto">
+                <button
+                  onClick={() => setIsOrderModalOpen(false)}
+                  className="px-4 py-2 bg-gray-100 rounded-lg hover:bg-gray-200 transition"
+                  disabled={isSubmitting}
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleSubmitOrder}
+                  className="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition disabled:opacity-50"
+                  disabled={isSubmitting || !customerName || !customerPhone || !customerAddress || (paymentMethod === 'transfer' && !paymentReceipt)}
+                >
+                  {isSubmitting ? 'Procesando...' : 'Confirmar Pedido'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </Modal>
+      
+      {/* Order tracker modal */}
+      <Modal isOpen={isTrackerOpen} onClose={() => setIsTrackerOpen(false)} title="Seguimiento de Pedido">
+        <CustomerOrderTracker orderNumber={orderNumber} />
+      </Modal>
+      
+      {/* Order history modal */}
+      <Modal isOpen={isHistoryModalOpen} onClose={() => setIsHistoryModalOpen(false)} title="Mis Pedidos">
+        {orderHistory.length === 0 ? (
+          <p className="text-center py-8 text-gray-500">No tienes pedidos anteriores</p>
+        ) : (
+          <div className="space-y-4">
+            {orderHistory.map(order => (
+              <div 
+                key={order.id} 
+                className="border rounded-lg p-4 hover:bg-gray-50 cursor-pointer"
+                onClick={() => handleViewOrderDetails(order)}
+              >
+                <div className="flex justify-between">
+                  <p className="font-medium">Pedido #{order.order_number}</p>
+                  <p className={`text-sm ${
+                    order.status === 'completed' ? 'text-green-500' : 
+                    order.status === 'cancelled' ? 'text-red-500' : 'text-orange-500'
+                  }`}>
+                    {order.status === 'pending' ? 'Pendiente' : 
+                     order.status === 'preparing' ? 'En preparación' :
+                     order.status === 'ready' ? 'Listo' :
+                     order.status === 'delivering' ? 'En camino' :
+                     order.status === 'completed' ? 'Entregado' : 'Cancelado'}
+                  </p>
+                </div>
+                <p className="text-sm text-gray-500">
+                  {new Date(order.created_at).toLocaleDateString()} - {formatCurrencyCOP(order.total)}
+                </p>
+                <p className="text-sm text-gray-500 mt-1">
+                  {order.items.reduce((total, item) => total + item.quantity, 0)} productos
+                </p>
+              </div>
+            ))}
+          </div>
+        )}
+      </Modal>
+      
+      {/* Order details modal */}
+      <Modal 
+        isOpen={isDetailsModalOpen} 
+        onClose={() => setIsDetailsModalOpen(false)} 
+        title={`Detalles del Pedido #${selectedHistoryOrder?.order_number}`}
+      >
+        {selectedHistoryOrder && (
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <p className="text-sm text-gray-500">Fecha</p>
+                <p>{new Date(selectedHistoryOrder.created_at).toLocaleDateString()}</p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-500">Estado</p>
+                <p className={`${
+                  selectedHistoryOrder.status === 'completed' ? 'text-green-500' : 
+                  selectedHistoryOrder.status === 'cancelled' ? 'text-red-500' : 'text-orange-500'
+                }`}>
+                  {selectedHistoryOrder.status === 'pending' ? 'Pendiente' : 
+                   selectedHistoryOrder.status === 'preparing' ? 'En preparación' :
+                   selectedHistoryOrder.status === 'ready' ? 'Listo' :
+                   selectedHistoryOrder.status === 'delivering' ? 'En camino' :
+                   selectedHistoryOrder.status === 'completed' ? 'Entregado' : 'Cancelado'}
+                </p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-500">Dirección</p>
+                <p>{selectedHistoryOrder.customer_address}</p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-500">Método de pago</p>
+                <p>{selectedHistoryOrder.payment_method === 'cash' ? 'Efectivo' : 'Transferencia'}</p>
+              </div>
+            </div>
+            
+            <div className="border-t pt-4">
+              <p className="font-medium mb-2">Productos</p>
+              <div className="space-y-2">
+                {selectedHistoryOrder.items.map((item, index) => (
+                  <div key={index} className="flex justify-between">
+                    <p>
+                      {item.quantity}x {item.product_name}
+                      {item.notes && <span className="text-sm text-gray-500 block">{item.notes}</span>}
+                    </p>
+                    <p>{formatCurrencyCOP(item.product_price * item.quantity)}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+            
+            <div className="border-t pt-4">
+              <div className="flex justify-between font-bold">
+                <span>Total:</span>
+                <span>{formatCurrencyCOP(selectedHistoryOrder.total)}</span>
+              </div>
+            </div>
+            
+            {selectedHistoryOrder.status === 'pending' && (
+              <div className="flex justify-end pt-4">
+                <button
+                  onClick={() => {
+                    setIsDetailsModalOpen(false);
+                    setIsTrackerOpen(true);
+                    setOrderNumber(selectedHistoryOrder.order_number);
+                  }}
+                  className="flex items-center gap-1 px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition"
+                >
+                  <MessageCircle size={16} />
+                  <span>Seguir pedido</span>
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+      </Modal>
+      
+      {/* Floating cart button for mobile */}
+      <div className="md:hidden fixed bottom-6 right-6">
+        <button 
+          onClick={() => setIsCartOpen(true)}
+          className="w-14 h-14 rounded-full bg-orange-500 text-white flex items-center justify-center shadow-lg hover:bg-orange-600 transition relative"
+        >
+          <ShoppingCart size={24} />
+          {cart.length > 0 && (
+            <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs w-5 h-5 flex items-center justify-center rounded-full">
+              {cart.reduce((total, item) => total + item.quantity, 0)}
+            </span>
+          )}
+        </button>
+      </div>
+    </div>
+  );
 };
 
 export default CommandeClient;

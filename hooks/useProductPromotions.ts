@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Product } from '../types';
-import { Promotion } from '../types/promotions';
+import { Promotion, PromotionConditions } from '../types/promotions';
 import { fetchActivePromotions } from '../services/promotionsApi';
 
 /**
@@ -14,56 +14,67 @@ const useProductPromotions = (product: Product | null) => {
   const [error, setError] = useState<Error | null>(null);
 
   useEffect(() => {
-    // Si aucun produit n'est fourni, ne rien faire
     if (!product) {
+      console.log('[useProductPromotions] No product provided, skipping promotion fetch.');
       setPromotions([]);
       setLoading(false);
       return;
     }
 
     const fetchPromotions = async () => {
+      console.log(`[useProductPromotions] Starting promotion fetch for product: ${product.nom_produit} (ID: ${product.id}, Category ID: ${product.categoria_id})`);
       try {
         setLoading(true);
-        // Utiliser un tableau vide par défaut pour éviter les erreurs
-        const allActivePromotions = await fetchActivePromotions().catch(() => []);
+        const allActivePromotions = await fetchActivePromotions().catch(err => {
+          console.error('[useProductPromotions] Error fetching active promotions from API:', err);
+          return [];
+        });
         
-        // Filtrer les promotions applicables au produit
+        console.log('[useProductPromotions] All active promotions fetched:', allActivePromotions);
+
         const applicablePromotions = allActivePromotions.filter(promotion => {
-          // Si la promotion n'est pas active, elle ne s'applique pas
+          console.log(`[useProductPromotions] Evaluating promotion: ${promotion.name} (ID: ${promotion.id})`);
           if (promotion.status !== 'active') {
+            console.log(`[useProductPromotions] Promotion ${promotion.name} is not active.`);
             return false;
           }
 
-          const conditions = promotion.conditions || {};
-          
-          // Si la promotion n'a pas de conditions spécifiques aux produits, elle ne s'applique pas directement aux produits
-          if (!conditions.product_ids && !conditions.category_ids) {
+          const conditionsArray = Array.isArray(promotion.conditions) ? promotion.conditions : [];
+          console.log(`[useProductPromotions] Promotion ${promotion.name} conditions:`, conditionsArray);
+
+          if (conditionsArray.length === 0) {
+            console.log(`[useProductPromotions] Promotion ${promotion.name} has no specific conditions, not applicable to a product.`);
             return false;
           }
-          
-          // Vérifier si le produit est directement concerné
-          if (conditions.product_ids?.includes(product.id)) {
-            return true;
-          }
-          
-          // Vérifier si la catégorie du produit est concernée
-          if (conditions.category_ids?.includes(product.category_id)) {
-            return true;
-          }
-          
-          return false;
+
+          const isApplicable = conditionsArray.some(condition => {
+            if (condition.type === 'specific_product' && Array.isArray(condition.value)) {
+              const applies = condition.value.includes(product.id);
+              console.log(`[useProductPromotions] Checking product condition for ${promotion.name}: product.id (${product.id}) in ${condition.value}? ${applies}`);
+              return applies;
+            }
+            if (condition.type === 'specific_category' && Array.isArray(condition.value)) {
+              const applies = condition.value.includes(product.categoria_id);
+              console.log(`[useProductPromotions] Checking category condition for ${promotion.name}: product.categoria_id (${product.categoria_id}) in ${condition.value}? ${applies}`);
+              return applies;
+            }
+            return false;
+          });
+          console.log(`[useProductPromotions] Promotion ${promotion.name} is applicable: ${isApplicable}`);
+          return isApplicable;
         });
         
-        // Trier les promotions par priorité (la plus haute d'abord)
+        console.log('[useProductPromotions] Filtered applicable promotions:', applicablePromotions);
+
         const sortedPromotions = applicablePromotions.sort((a, b) => 
           (b.priority || 0) - (a.priority || 0)
         );
         
+        console.log('[useProductPromotions] Sorted applicable promotions (best first):', sortedPromotions);
         setPromotions(sortedPromotions);
       } catch (err) {
-        console.error('Erreur lors du chargement des promotions:', err);
+        console.error('[useProductPromotions] Error during promotion processing:', err);
         setError(err instanceof Error ? err : new Error('Une erreur est survenue'));
-        // En cas d'erreur, définir un tableau vide pour éviter les erreurs
         setPromotions([]);
       } finally {
         setLoading(false);
@@ -73,8 +84,8 @@ const useProductPromotions = (product: Product | null) => {
     fetchPromotions();
   }, [product]);
 
-  // Retourner la promotion la plus prioritaire (si plusieurs sont applicables)
   const bestPromotion = promotions.length > 0 ? promotions[0] : null;
+  console.log('[useProductPromotions] Best promotion for product:', product?.nom_produit, bestPromotion);
 
   return { 
     promotions, 
@@ -83,5 +94,3 @@ const useProductPromotions = (product: Product | null) => {
     error 
   };
 };
-
-export default useProductPromotions;

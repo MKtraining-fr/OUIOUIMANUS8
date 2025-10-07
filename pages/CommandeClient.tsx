@@ -244,8 +244,8 @@ const OrderMenuView: React.FC = () => {
         const fetchData = async () => {
             try {
                 const [productsData, categoriesData] = await Promise.all([
-                    api.fetchProducts(),
-                    api.fetchCategories()
+                    api.getProducts(),
+                    api.getCategories()
                 ]);
                 setProducts(productsData);
                 setCategories(categoriesData);
@@ -254,7 +254,7 @@ const OrderMenuView: React.FC = () => {
                 const activeOrderId = getActiveCustomerOrder();
                 if (activeOrderId) {
                     try {
-                        const order = await api.fetchOrderById(activeOrderId);
+                        const order = await api.getOrderById(activeOrderId);
                         if (order) {
                             setOrderHistory([order]);
                         }
@@ -373,205 +373,238 @@ const OrderMenuView: React.FC = () => {
                 return acc;
             }
 
-            acc.push({
+            const newItem: OrderItem = {
                 ...item,
-                id: `oi${timestamp}-${index}`,
-                produitRef: product.id,
-                nom_produit: product.nom_produit,
-                prix_unitaire: product.prix_vente,
-            });
-
-            return acc;
+                id: `oi-${timestamp}-${index}`,
+                prix_unitaire: product.prix_vente, // Use current product price
+            };
+            return [...acc, newItem];
         }, []);
 
-        setCart(updatedItems);
-
         if (missingProducts.length > 0) {
-            alert(`Algunos artículos ya no están disponibles y no se agregaron:\n- ${missingProducts.join('\n- ')}`);
+            alert(`Algunos productos no están disponibles: ${missingProducts.join(", ")}. Se han omitido del pedido.`);
         }
 
-        const cartElement = document.getElementById('cart-section');
-        if(cartElement) {
-             cartElement.scrollIntoView({ behavior: 'smooth' });
-        }
-    };
-    
-    const generateWhatsAppMessage = (order: Order) => {
-        const header = `*Nuevo pedido OUIOUITACOS #${order.id.slice(-6)}*`;
-        const itemLines = (order.items ?? []).map(item => {
-            const baseLine = `- ${item.quantite}x ${item.nom_produit} (${formatCurrencyCOP(item.prix_unitaire)}) → ${formatCurrencyCOP(item.prix_unitaire * item.quantite)}`;
-            const details: string[] = [];
-            if (item.commentaire) {
-                details.push(`Comentario: ${item.commentaire}`);
-            }
-            if (item.excluded_ingredients && item.excluded_ingredients.length > 0) {
-                details.push(`Sin: ${item.excluded_ingredients.join(', ')}`);
-            }
-            return details.length > 0 ? `${baseLine}\n  ${details.join('\n  ')}` : baseLine;
-        });
-        const items = itemLines.length > 0 ? itemLines.join('\n') : 'Sin artículos';
-        const totalValue = order.total ?? order.items.reduce((sum, item) => sum + item.prix_unitaire * item.quantite, 0);
-        const totalMsg = `*Total: ${formatCurrencyCOP(totalValue)}*`;
-        const paymentMethod = order.payment_method ? `Pago: ${order.payment_method}` : undefined;
-        const client = `Cliente: ${order.clientInfo?.nom} (${order.clientInfo?.telephone})\nDirección: ${order.clientInfo?.adresse}`;
-        const footer = 'Comprobante de pago adjunto.';
-        const messageParts = [header, items, totalMsg, paymentMethod, client, footer].filter(Boolean);
-        return encodeURIComponent(messageParts.join('\n\n'));
+        setCart(updatedItems);
+        setOrderHistory([]); // Clear history after reordering
     };
 
-    if (loading) return <div className="h-screen flex items-center justify-center">Cargando el menú...</div>;
-    if (error) return <div className="h-screen flex items-center justify-center text-red-500">{error}</div>;
+    const generateWhatsAppMessage = (order: Order): string => {
+        const itemsText = order.items.map(item => `- ${item.quantite}x ${item.nom_produit} (${formatCurrencyCOP(item.prix_unitaire)})`).join("\n");
+        const totalText = `Total: ${formatCurrencyCOP(order.total)}`;
+        const clientText = `Cliente: ${order.clientInfo?.nom} (${order.clientInfo?.telephone})\nDirección: ${order.clientInfo?.adresse}`;
+        const paymentText = `Método de pago: ${order.payment_method === "transferencia" ? "Transferencia" : "Efectivo"}`;
+        const receiptText = order.receipt_url ? `Comprobante: ${order.receipt_url}` : "";
+
+        return encodeURIComponent(
+            `¡Hola! Aquí está mi pedido:\n\n${itemsText}\n\n${totalText}\n\n${clientText}\n${paymentText}\n${receiptText}`
+        );
+    };
 
     return (
-        <>
-            <main className="container mx-auto p-4 lg:grid lg:grid-cols-3 lg:gap-8">
-                {/* Menu Section */}
-                <div className="lg:col-span-2">
-                    {orderHistory.length > 0 && cart.length === 0 && (
-                        <div className="bg-white/95 p-4 rounded-xl shadow-xl mb-8">
-                            <h2 className="text-xl font-bold flex items-center gap-2 mb-3 text-gray-700"><History /> ¿Repetir un pedido?</h2>
-                            <div className="space-y-2">
-                                {orderHistory.slice(0, 3).map(order => (
-                                    <div
-                                        key={order.id}
-                                        className="flex justify-between items-center rounded-lg border border-white/20 bg-slate-900/80 p-3 text-slate-100 backdrop-blur-sm"
-                                    >
-                                        <div>
-                                            <p className="font-semibold text-white">Pedido del {new Date(order.date_creation).toLocaleDateString('es-CO')}</p>
-                                            <p className="text-sm text-slate-300">{order.items.length} artículo(s) - {formatCurrencyCOP(order.total)}</p>
-                                        </div>
-                                        <button
-                                            onClick={() => handleReorder(order)}
-                                            className="bg-orange-500 text-white font-semibold py-2 px-4 rounded-lg text-base transition hover:bg-orange-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-300"
-                                        >
-                                            Pedir de nuevo
-                                        </button>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    )}
-                    <div className="bg-white/95 p-4 rounded-xl shadow-xl">
-                        <div className="flex space-x-2 overflow-x-auto pb-2 mb-4">
-                            <button
-                                onClick={() => setActiveCategoryId('all')}
-                                className={`px-4 py-2 rounded-full font-semibold whitespace-nowrap transition border ${activeCategoryId === 'all' ? 'bg-brand-primary text-slate-900 border-brand-primary shadow-lg' : 'bg-slate-900/80 text-white border-white/20'}`}
-                            >
-                                Todos
-                            </button>
-                            {categories.map(cat => (
-                                <button
-                                    key={cat.id}
-                                    onClick={() => setActiveCategoryId(cat.id)}
-                                    className={`px-4 py-2 rounded-full font-semibold whitespace-nowrap transition border ${activeCategoryId === cat.id ? 'bg-brand-primary text-slate-900 border-brand-primary shadow-lg' : 'bg-slate-900/80 text-white border-white/20'}`}
-                                >
-                                    {cat.nom}
-                                </button>
-                            ))}
-                        </div>
-                        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-                            {filteredProducts.map(product => (
-                                <ProductCardWithPromotion 
-                                    key={product.id} 
-                                    product={product} 
-                                    onClick={() => handleProductClick(product)} 
-                                />
-                            ))}
-                        </div>
-                    </div>
+        <div className="min-h-screen bg-gray-100 flex flex-col lg:flex-row">
+            {/* Main Content */}
+            <div className="flex-1 p-4 lg:p-8">
+                <h1 className="text-3xl font-bold text-gray-800 mb-6">Realizar Pedido</h1>
+
+                {/* Category Filters */}
+                <div className="flex space-x-3 mb-6 overflow-x-auto pb-2">
+                    <button
+                        onClick={() => setActiveCategoryId("all")}
+                        className={`px-5 py-2 rounded-full text-sm font-medium transition-colors ${activeCategoryId === "all" ? "bg-brand-primary text-white" : "bg-white text-gray-700 shadow-sm hover:bg-gray-50"}`}
+                    >
+                        Todos
+                    </button>
+                    {categories.map(category => (
+                        <button
+                            key={category.id}
+                            onClick={() => setActiveCategoryId(category.id)}
+                            className={`px-5 py-2 rounded-full text-sm font-medium transition-colors ${activeCategoryId === category.id ? "bg-brand-primary text-white" : "bg-white text-gray-700 shadow-sm hover:bg-gray-50"}`}
+                        >
+                            {category.nom}
+                        </button>
+                    ))}
                 </div>
 
-                {/* Cart Section */}
-                <div id="cart-section" className="lg:col-span-1 mt-8 lg:mt-0 lg:sticky top-24 self-start">
-                    <div className="bg-white/95 p-4 rounded-xl shadow-xl">
-                        <h2 className="text-2xl font-bold flex items-center gap-2 mb-4 text-gray-700"><ShoppingCart/> Mi carrito</h2>
-                        {cart.length === 0 ? <p className="text-gray-500">Tu carrito está vacío.</p> :
-                            <div className="space-y-3">
-                                {cart.map(item => (
-                                    <div key={item.id} className="flex justify-between items-start">
-                                        <div>
-                                            <p className="font-semibold text-gray-700">{item.nom_produit}</p>
-                                            {item.commentaire && <p className="text-xs text-gray-500 italic">"{item.commentaire}"</p>}
-                                            <p className="text-sm text-gray-600 font-semibold">{formatCurrencyCOP(item.prix_unitaire * item.quantite)}</p>
-                                        </div>
-                                        <div className="flex items-center gap-2">
-                                            <button onClick={() => handleQuantityChange(item.id, -1)} className="p-1 rounded-full bg-gray-200"><Minus size={14}/></button>
-                                            <span className="font-bold w-5 text-center text-gray-700">{item.quantite}</span>
-                                            <button onClick={() => handleQuantityChange(item.id, 1)} className="p-1 rounded-full bg-gray-200"><Plus size={14}/></button>
-                                        </div>
-                                    </div>
-                                ))}
-                                <div key="delivery-fee" className="flex justify-between items-start border-t pt-3">
-                                    <div>
-                                        <p className="font-semibold text-gray-700">{DOMICILIO_ITEM_NAME}</p>
-                                        <p className="text-sm text-gray-600 font-semibold">{formatCurrencyCOP(DOMICILIO_FEE)}</p>
-                                    </div>
+                {/* Product Grid */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+                    {filteredProducts.map(product => (
+                        <ProductCardWithPromotion
+                            key={product.id}
+                            product={product}
+                            onClick={() => handleProductClick(product)}
+                        />
+                    ))}
+                </div>
+            </div>
+
+            {/* Order Summary / Cart */}
+            <div className="lg:w-96 bg-white p-4 lg:p-6 shadow-lg flex flex-col">
+                <h2 className="text-2xl font-bold text-gray-800 mb-4">Mi Carrito</h2>
+                
+                {cart.length === 0 ? (
+                    <div className="flex-1 flex flex-col items-center justify-center text-gray-500">
+                        <ShoppingCart size={48} className="mb-3" />
+                        <p>Tu carrito está vacío.</p>
+                    </div>
+                ) : (
+                    <div className="flex-1 overflow-y-auto pr-2 -mr-2">
+                        {cart.map(item => (
+                            <div key={item.id} className="flex items-center justify-between py-3 border-b border-gray-200 last:border-b-0">
+                                <div>
+                                    <p className="font-medium text-gray-800">{item.nom_produit}</p>
+                                    {item.commentaire && <p className="text-sm text-gray-500 italic">{item.commentaire}</p>}
+                                    {item.excluded_ingredients && item.excluded_ingredients.length > 0 && (
+                                        <p className="text-xs text-gray-500">Sin: {item.excluded_ingredients.join(", ")}</p>
+                                    )}
+                                    <p className="text-sm text-gray-600">{formatCurrencyCOP(item.prix_unitaire)}</p>
+                                </div>
+                                <div className="flex items-center">
+                                    <button
+                                        onClick={() => handleQuantityChange(item.id, -1)}
+                                        className="text-brand-primary hover:text-brand-primary-dark p-1"
+                                    >
+                                        <Minus size={16} />
+                                    </button>
+                                    <span className="mx-2 text-gray-700 font-medium">{item.quantite}</span>
+                                    <button
+                                        onClick={() => handleQuantityChange(item.id, 1)}
+                                        className="text-brand-primary hover:text-brand-primary-dark p-1"
+                                    >
+                                        <Plus size={16} />
+                                    </button>
                                 </div>
                             </div>
-                        }
-                        <div className="border-t my-4"></div>
-                        <div className="flex justify-between text-xl font-bold text-gray-700">
-                            <span>Total</span>
-                            <span>{formatCurrencyCOP(total)}</span>
-                        </div>
-
-                        {cart.length > 0 && (
-                            <form onSubmit={handleSubmitOrder} className="mt-6 space-y-4">
-                                <div>
-                                    <label className="text-sm font-medium text-gray-700">Nombre completo</label>
-                                    <input type="text" required value={clientInfo.nom} onChange={e => setClientInfo({...clientInfo, nom: e.target.value})} className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-brand-primary focus:border-brand-primary text-gray-700 bg-white"/>
-                                </div>
-                                <div>
-                                    <label className="text-sm font-medium text-gray-700">Teléfono</label>
-                                    <input type="tel" required value={clientInfo.telephone} onChange={e => setClientInfo({...clientInfo, telephone: e.target.value})} className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-brand-primary focus:border-brand-primary text-gray-700 bg-white"/>
-                                </div>
-                                <div>
-                                    <label className="text-sm font-medium text-gray-700">Dirección de entrega</label>
-                                    <input type="text" required value={clientInfo.adresse} onChange={e => setClientInfo({...clientInfo, adresse: e.target.value})} className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-brand-primary focus:border-brand-primary text-gray-700 bg-white"/>
-                                </div>
-                                <div>
-                                    <label className="text-sm font-medium text-gray-700">Método de pago</label>
-                                    <div className="mt-1 flex space-x-4">
-                                        <label className="inline-flex items-center">
-                                            <input type="radio" checked={paymentMethod === 'transferencia'} onChange={() => setPaymentMethod('transferencia')} className="form-radio text-brand-primary"/>
-                                            <span className="ml-2 text-gray-700">Transferencia</span>
-                                        </label>
-                                        <label className="inline-flex items-center">
-                                            <input type="radio" checked={paymentMethod === 'efectivo'} onChange={() => setPaymentMethod('efectivo')} className="form-radio text-brand-primary"/>
-                                            <span className="ml-2 text-gray-700">Efectivo</span>
-                                        </label>
-                                    </div>
-                                </div>
-                                {paymentMethod === 'transferencia' && (
-                                    <div>
-                                        <label className="text-sm font-medium text-gray-700">Comprobante de pago</label>
-                                        <input type="file" required accept="image/*" onChange={e => setPaymentProof(e.target.files?.[0] || null)} className="mt-1 block w-full text-gray-700"/>
-                                        <p className="mt-1 text-xs text-gray-500">Sube una captura de pantalla o foto del comprobante de transferencia.</p>
-                                    </div>
-                                )}
-                                <button type="submit" disabled={submitting} className="w-full bg-brand-primary text-white font-bold py-3 px-4 rounded-lg hover:bg-brand-primary-dark transition disabled:opacity-50">
-                                    {submitting ? 'Enviando...' : 'Realizar pedido'}
-                                </button>
-                            </form>
+                        ))}
+                        {cart.some(isDeliveryFeeItem) && (
+                            <div className="flex items-center justify-between py-3 border-b border-gray-200 last:border-b-0">
+                                <p className="font-medium text-gray-800">{DOMICILIO_ITEM_NAME}</p>
+                                <p className="text-sm text-gray-600">{formatCurrencyCOP(DOMICILIO_FEE)}</p>
+                            </div>
                         )}
                     </div>
+                )}
+
+                <div className="mt-auto pt-4 border-t border-gray-200">
+                    <div className="flex justify-between items-center mb-3">
+                        <p className="text-lg font-bold text-gray-800">Total:</p>
+                        <p className="text-xl font-bold text-brand-primary">{formatCurrencyCOP(total)}</p>
+                    </div>
+
+                    {orderHistory.length > 0 && (
+                        <div className="mb-4 p-3 bg-blue-50 rounded-lg">
+                            <p className="font-semibold text-blue-700 mb-2">Pedido anterior:</p>
+                            {orderHistory.map(order => (
+                                <div key={order.id} className="flex justify-between items-center text-sm text-blue-600 mb-1">
+                                    <span>#{order.id.slice(-6)} - {formatCurrencyCOP(order.total)}</span>
+                                    <button onClick={() => handleReorder(order)} className="text-blue-500 hover:underline flex items-center">
+                                        <History size={16} className="mr-1" /> Reordenar
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+
+                    <form onSubmit={handleSubmitOrder} className="space-y-4">
+                        <div>
+                            <label htmlFor="clientName" className="block text-sm font-medium text-gray-700">Nombre:</label>
+                            <input
+                                type="text"
+                                id="clientName"
+                                value={clientInfo.nom}
+                                onChange={(e) => setClientInfo({...clientInfo, nom: e.target.value})}
+                                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
+                                required
+                            />
+                        </div>
+                        <div>
+                            <label htmlFor="clientPhone" className="block text-sm font-medium text-gray-700">Teléfono:</label>
+                            <input
+                                type="tel"
+                                id="clientPhone"
+                                value={clientInfo.telephone}
+                                onChange={(e) => setClientInfo({...clientInfo, telephone: e.target.value})}
+                                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
+                                required
+                            />
+                        </div>
+                        <div>
+                            <label htmlFor="clientAddress" className="block text-sm font-medium text-gray-700">Dirección:</label>
+                            <input
+                                type="text"
+                                id="clientAddress"
+                                value={clientInfo.adresse}
+                                onChange={(e) => setClientInfo({...clientInfo, adresse: e.target.value})}
+                                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
+                                required
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700">Método de Pago:</label>
+                            <div className="mt-1 flex space-x-4">
+                                <label className="inline-flex items-center">
+                                    <input
+                                        type="radio"
+                                        name="paymentMethod"
+                                        value="transferencia"
+                                        checked={paymentMethod === "transferencia"}
+                                        onChange={() => setPaymentMethod("transferencia")}
+                                        className="form-radio"
+                                    />
+                                    <span className="ml-2">Transferencia</span>
+                                </label>
+                                <label className="inline-flex items-center">
+                                    <input
+                                        type="radio"
+                                        name="paymentMethod"
+                                        value="efectivo"
+                                        checked={paymentMethod === "efectivo"}
+                                        onChange={() => setPaymentMethod("efectivo")}
+                                        className="form-radio"
+                                    />
+                                    <span className="ml-2">Efectivo</span>
+                                </label>
+                            </div>
+                        </div>
+                        {paymentMethod === "transferencia" && (
+                            <div>
+                                <label htmlFor="paymentProof" className="block text-sm font-medium text-gray-700">Comprobante de Pago:</label>
+                                <input
+                                    type="file"
+                                    id="paymentProof"
+                                    accept="image/*"
+                                    onChange={(e) => setPaymentProof(e.target.files ? e.target.files[0] : null)}
+                                    className="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-brand-primary file:text-white hover:file:bg-brand-primary-dark"
+                                    required
+                                />
+                            </div>
+                        )}
+                        <button
+                            type="submit"
+                            className="w-full bg-green-500 text-white font-bold py-3 px-4 rounded-lg hover:bg-green-600 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                            disabled={submitting || cart.length === 0}
+                        >
+                            {submitting ? "Enviando..." : "Confirmar Pedido"}
+                        </button>
+                    </form>
                 </div>
-            </main>
-            
+            </div>
+
             <ProductModal
                 isOpen={modalOpen}
                 onClose={() => setModalOpen(false)}
                 selectedProduct={selectedProduct}
                 onAddToCart={handleAddToCart}
             />
-            
+
             <ConfirmationModal
                 isOpen={confirmOpen}
                 order={submittedOrder}
                 onClose={() => setConfirmOpen(false)}
             />
-        </>
+        </div>
     );
 };
 
 export default OrderMenuView;
+

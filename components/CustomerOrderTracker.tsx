@@ -225,7 +225,7 @@ const CustomerOrderTracker: React.FC<CustomerOrderTrackerProps> = ({ orderId, on
                             <button onClick={onNewOrderClick} className={`${variant === 'hero' ? 'bg-gray-200 text-gray-800' : 'bg-brand-primary text-brand-secondary'} font-bold py-3 px-6 rounded-lg hover:bg-gray-300 transition`}>
                                 Nouvelle commande
                             </button>
-                            <button onClick={() => window.history.back()} className="text-sm text-gray-500 hover:underline">
+                            <button onClick={onNewOrderClick} className="text-sm text-gray-500 hover:underline">
                                 Volver al menu
                             </button>
                         </div>
@@ -234,7 +234,7 @@ const CustomerOrderTracker: React.FC<CustomerOrderTrackerProps> = ({ orderId, on
                             <p className={`text-sm ${variant === 'hero' ? 'text-gray-300' : 'text-gray-600'}`}>
                                 Le statut de votre commande est mis à jour automatiquement.
                             </p>
-                            <button onClick={() => window.history.back()} className="text-sm text-gray-500 hover:underline">
+                            <button onClick={onNewOrderClick} className="text-sm text-gray-500 hover:underline">
                                 Volver al menu
                             </button>
                         </div>

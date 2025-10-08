@@ -619,16 +619,29 @@ type SelectProductsQueryOptions = {
   orderBy?: { column: string; ascending?: boolean; nullsFirst?: boolean };
   includeBestSellerColumns?: boolean;
   includeRecipes?: boolean;
-};
+}const selectProductsQuery = (options?: SelectProductsQueryOptions) => {
+  const includeBestSellerColumns = options?.includeBestSellerColumns !== false;
+  const includeRecipes = options?.includeRecipes !== false;
 
-const buildProductSelectColumns = (includeBestSellerColumns: boolean, includeRecipes: boolean) => {
-  let selectString = `id, nom_produit, description, prix_vente, categoria_id, estado, image`;
+  let query = supabase
+    .from("products")
+    .select(`
+      id, nom_produit, description, prix_vente, categoria_id, estado, image
+      ${includeBestSellerColumns ? ', is_best_seller, best_seller_rank' : ''}
+      ${includeRecipes ? ', product_recipes:product_recipes(ingredient_id, qte_utilisee)' : ''}
+    `);
 
-  if (includeBestSellerColumns) {
-    selectString += `, is_best_seller, best_seller_rank`;
+  if (options?.orderBy) {
+    query = query.order(options.orderBy.column, {
+      ascending: options.orderBy.ascending ?? true,
+      nullsFirst: options.orderBy.nullsFirst,
+    });
+  } else {
+    query = query.order("nom_produit");
   }
 
-  if (includeRecipes) {
+  return query;
+};  if (includeRecipes) {
     selectString += `, product_recipes:product_recipes(ingredient_id, qte_utilisee)`;
   }
 

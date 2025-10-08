@@ -21,7 +21,7 @@ import {
 } from '../utils/siteStyleHelpers';
 import { resolveZoneFromElement } from '../components/SitePreviewCanvas';
 import { getHomeRedirectPath } from '../utils/navigation';
-import { DEFAULT_SITE_CONTENT as BASE_SITE_CONTENT } from '../utils/siteContent';
+import { DEFAULT_SITE_CONTENT as UTILS_DEFAULT_SITE_CONTENT } from '../utils/siteContent';
 import { withAppendedQueryParam } from '../utils/url';
 
 const DEFAULT_BRAND_LOGO = '/logo-brand.svg';
@@ -37,65 +37,7 @@ const createDefaultSectionStyle = (): SectionStyle => ({
   textColor: '#000000',
 });
 
-const DEFAULT_SITE_CONTENT: SiteContent = {
-  navigation: {
-    brand: '',
-    brandLogo: DEFAULT_BRAND_LOGO,
-    staffLogo: DEFAULT_BRAND_LOGO,
-    links: {
-      home: '',
-      about: '',
-      menu: '',
-      contact: '',
-      loginCta: '',
-    },
-    style: createDefaultSectionStyle(),
-  },
-  hero: {
-    title: '',
-    subtitle: '',
-    ctaLabel: '',
-    backgroundImage: null,
-    historyTitle: '',
-    reorderCtaLabel: '',
-    style: createDefaultSectionStyle(),
-  },
-  about: {
-    title: '',
-    description: '',
-    image: null,
-    style: createDefaultSectionStyle(),
-  },
-  menu: {
-    title: '',
-    ctaLabel: '',
-    loadingLabel: '',
-    image: null,
-    style: createDefaultSectionStyle(),
-  },
-  instagramReviews: JSON.parse(JSON.stringify(BASE_SITE_CONTENT.instagramReviews)) as SiteContent['instagramReviews'],
-  findUs: {
-    title: '',
-    addressLabel: '',
-    address: '',
-    cityLabel: '',
-    city: '',
-    hoursLabel: '',
-    hours: '',
-    mapLabel: '',
-    mapUrl: '',
-    style: createDefaultSectionStyle(),
-  },
-  footer: {
-    text: '',
-    style: createDefaultSectionStyle(),
-  },
-  elementStyles: {},
-  elementRichText: {},
-  assets: {
-    library: [],
-  },
-};
+const DEFAULT_SITE_CONTENT: SiteContent = UTILS_DEFAULT_SITE_CONTENT;
 
 type PinInputProps = {
   pin: string;

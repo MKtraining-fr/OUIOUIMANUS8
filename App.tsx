@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { getActiveCustomerOrder, clearActiveCustomerOrder } from './services/customerOrderStorage';
+import useSiteContent from './hooks/useSiteContent';
+import useSiteContent from './hooks/useSiteContent';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import ProtectedLayout from './pages/ProtectedLayout';
 import Login from './pages/Login';

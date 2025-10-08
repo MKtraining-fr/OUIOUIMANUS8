@@ -577,13 +577,14 @@ const mapTableRowWithMeta = async (row: SupabaseTableRow): Promise<Table> => {
     : new Map();
 
   return mapTableRow(row, orderMeta);
-const selectOrdersQuery = () => supabase.from("orders").select("*, order_items(*), subtotal, total_discount, promo_code, applied_promotions");  `
-        id,
-        type,
-        table_id,
-        table_nom,
-        couverts,
-        statut,
+const selectOrdersQuery = () => supabase.from("orders").select(`
+        *,
+        order_items(*),
+        subtotal,
+        total_discount,
+        promo_code,
+        applied_promotions
+      `);
         estado_cocina,
         date_creation,
         date_envoi_cuisine,

@@ -8,27 +8,7 @@ import React, {
   useId,
 } from 'react';
 import { createPortal } from 'react-dom';
-import { 
-  AlertTriangle, 
-  CheckCircle2, 
-  Loader2, 
-  Upload, 
-  X, 
-  Search, 
-  Palette, 
-  History, 
-  Eye, 
-  Settings,
-  ChevronDown,
-  ChevronUp,
-  Filter,
-  Save,
-  Undo,
-  Redo,
-  Copy,
-  Download,
-  RefreshCw
-} from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Loader2, Upload, X } from 'lucide-react';
 import SitePreviewCanvas, { resolveZoneFromElement } from '../components/SitePreviewCanvas';
 import useSiteContent from '../hooks/useSiteContent';
 import RichTextEditor from '../components/RichTextEditor';
@@ -78,24 +58,6 @@ const COLOR_SUGGESTIONS = [
   '#f97316',
   'transparent',
   'currentColor',
-] as const;
-
-const EXTENDED_COLOR_PALETTE = {
-  neutrals: ['#ffffff', '#f8fafc', '#f1f5f9', '#e2e8f0', '#cbd5e1', '#94a3b8', '#64748b', '#475569', '#334155', '#1e293b', '#0f172a'],
-  blues: ['#eff6ff', '#dbeafe', '#bfdbfe', '#93c5fd', '#60a5fa', '#3b82f6', '#2563eb', '#1d4ed8', '#1e40af', '#1e3a8a'],
-  reds: ['#fef2f2', '#fecaca', '#fca5a5', '#f87171', '#ef4444', '#dc2626', '#b91c1c', '#991b1b', '#7f1d1d'],
-  greens: ['#f0fdf4', '#dcfce7', '#bbf7d0', '#86efac', '#4ade80', '#22c55e', '#16a34a', '#15803d', '#166534'],
-  yellows: ['#fefce8', '#fef3c7', '#fde68a', '#fcd34d', '#fbbf24', '#f59e0b', '#d97706', '#b45309', '#92400e'],
-  oranges: ['#fff7ed', '#fed7aa', '#fdba74', '#fb923c', '#f97316', '#ea580c', '#dc2626', '#c2410c', '#9a3412'],
-  purples: ['#faf5ff', '#f3e8ff', '#e9d5ff', '#d8b4fe', '#c084fc', '#a855f7', '#9333ea', '#7c3aed', '#6b21a8'],
-  pinks: ['#fdf2f8', '#fce7f3', '#fbcfe8', '#f9a8d4', '#f472b6', '#ec4899', '#db2777', '#be185d', '#9d174d']
-} as const;
-
-const BRAND_COLORS = [
-  '#F9A826', // brand-primary
-  '#DD8C00', // brand-primary-dark  
-  '#2D2D2D', // brand-secondary
-  '#E63946', // brand-accent
 ] as const;
 
 const TEXT_ELEMENT_KEYS = new Set<EditableElementKey>(STYLE_EDITABLE_ELEMENT_KEYS);
@@ -161,83 +123,11 @@ const ELEMENT_LABELS: Partial<Record<EditableElementKey, string>> = {
 };
 
 const TABS = [
-  { id: 'preview', label: 'Aperçu', icon: Eye },
-  { id: 'custom', label: 'Personnalisation', icon: Settings },
-  { id: 'themes', label: 'Thèmes', icon: Palette },
-  { id: 'history', label: 'Historique', icon: History },
+  { id: 'preview', label: 'Aperçu' },
+  { id: 'custom', label: 'Personnalisation' },
 ] as const;
 
 type TabId = (typeof TABS)[number]['id'];
-
-// Thèmes prédéfinis
-const PREDEFINED_THEMES = [
-  {
-    id: 'modern',
-    name: 'Moderne',
-    description: 'Design épuré et contemporain',
-    preview: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-    colors: {
-      primary: '#667eea',
-      secondary: '#764ba2',
-      background: '#f8fafc',
-      text: '#1e293b',
-    },
-  },
-  {
-    id: 'warm',
-    name: 'Chaleureux',
-    description: 'Couleurs chaudes et accueillantes',
-    preview: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
-    colors: {
-      primary: '#f093fb',
-      secondary: '#f5576c',
-      background: '#fef7f0',
-      text: '#7c2d12',
-    },
-  },
-  {
-    id: 'nature',
-    name: 'Nature',
-    description: 'Inspiré de la nature et du bio',
-    preview: 'linear-gradient(135deg, #11998e 0%, #38ef7d 100%)',
-    colors: {
-      primary: '#11998e',
-      secondary: '#38ef7d',
-      background: '#f0fdf4',
-      text: '#14532d',
-    },
-  },
-  {
-    id: 'elegant',
-    name: 'Élégant',
-    description: 'Sophistication et luxe',
-    preview: 'linear-gradient(135deg, #2c3e50 0%, #34495e 100%)',
-    colors: {
-      primary: '#2c3e50',
-      secondary: '#34495e',
-      background: '#f8fafc',
-      text: '#1e293b',
-    },
-  },
-] as const;
-
-// Historique des modifications
-interface ModificationHistory {
-  id: string;
-  timestamp: Date;
-  description: string;
-  content: SiteContent;
-  type: 'manual' | 'theme' | 'reset';
-}
-
-// États de l'interface
-interface UIState {
-  searchQuery: string;
-  selectedSection: EditableZoneKey | null;
-  showAdvancedOptions: boolean;
-  autoSave: boolean;
-  previewMode: 'desktop' | 'tablet' | 'mobile';
-}
 
 type DraftUpdater = (current: SiteContent) => SiteContent;
 
@@ -454,8 +344,6 @@ const EditorPopover: React.FC<EditorPopoverProps> = ({
   const [isMounted, setIsMounted] = useState(false);
   const [isPositioned, setIsPositioned] = useState(false);
   const [arrowPosition, setArrowPosition] = useState<{ top: number; left: number } | null>(null);
-  const [isDragging, setIsDragging] = useState(false);
-  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
 
   useEffect(() => {
     setIsMounted(true);
@@ -635,46 +523,6 @@ const EditorPopover: React.FC<EditorPopoverProps> = ({
     target.focus({ preventScroll: true });
   }, [isMounted]);
 
-  // Gestion du glisser-déposer
-  const handleMouseDown = useCallback((e: React.MouseEvent) => {
-    if (e.target === e.currentTarget || (e.target as HTMLElement).closest('[data-draggable]')) {
-      setIsDragging(true);
-      const rect = containerRef.current?.getBoundingClientRect();
-      if (rect) {
-        setDragOffset({
-          x: e.clientX - rect.left,
-          y: e.clientY - rect.top,
-        });
-      }
-    }
-  }, []);
-
-  const handleMouseMove = useCallback((e: MouseEvent) => {
-    if (isDragging && containerRef.current) {
-      const newPosition = {
-        top: e.clientY - dragOffset.y,
-        left: e.clientX - dragOffset.x,
-      };
-      setPosition(newPosition);
-    }
-  }, [isDragging, dragOffset]);
-
-  const handleMouseUp = useCallback(() => {
-    setIsDragging(false);
-  }, []);
-
-  useEffect(() => {
-    if (isDragging) {
-      document.addEventListener('mousemove', handleMouseMove);
-      document.addEventListener('mouseup', handleMouseUp);
-      return () => {
-        document.removeEventListener('mousemove', handleMouseMove);
-        document.removeEventListener('mouseup', handleMouseUp);
-      };
-    }
-    return () => {};
-  }, [isDragging, handleMouseMove, handleMouseUp]);
-
   if (typeof document === 'undefined' || !isMounted) {
     return null;
   }
@@ -687,29 +535,11 @@ const EditorPopover: React.FC<EditorPopoverProps> = ({
         aria-modal="true"
         aria-labelledby={headingId}
         tabIndex={-1}
-        className={`customization-popover pointer-events-auto flex w-[min(90vw,32rem)] flex-col overflow-hidden rounded-3xl bg-white shadow-2xl ring-1 ring-slate-200 ${
-          isDragging ? 'cursor-grabbing' : 'cursor-grab'
-        }`}
-        style={{ 
-          position: 'absolute', 
-          top: position.top, 
-          left: position.left, 
-          opacity: isPositioned ? 1 : 0,
-          transform: isDragging ? 'scale(1.02)' : 'scale(1)',
-          transition: isDragging ? 'none' : 'all 0.2s ease',
-        }}
-        onMouseDown={handleMouseDown}
+        className="pointer-events-auto flex w-[min(90vw,32rem)] flex-col overflow-hidden rounded-3xl bg-white shadow-2xl ring-1 ring-slate-200"
+        style={{ position: 'absolute', top: position.top, left: position.left, opacity: isPositioned ? 1 : 0 }}
       >
-        <div 
-          className="flex items-center justify-between border-b border-slate-200 px-6 py-4 cursor-grab"
-          data-draggable
-        >
-          <div className="flex items-center gap-3">
-            <div className="w-2 h-2 bg-gray-300 rounded-full" />
-            <div className="w-2 h-2 bg-gray-300 rounded-full" />
-            <div className="w-2 h-2 bg-gray-300 rounded-full" />
-          </div>
-          <h2 id={headingId} className="text-lg font-semibold text-slate-900 flex-1 text-center">
+        <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
+          <h2 id={headingId} className="text-lg font-semibold text-slate-900">
             {title}
           </h2>
           <button
@@ -739,11 +569,895 @@ const EditorPopover: React.FC<EditorPopoverProps> = ({
   return createPortal(content, document.body);
 };
 
-// Le reste du fichier reste inchangé...
+interface TextElementEditorProps {
+  element: EditableElementKey;
+  label: string;
+  draft: SiteContent;
+  onApply: (updater: DraftUpdater) => void;
+  onClose: () => void;
+  fontOptions: readonly string[];
+  onAssetAdded: (asset: CustomizationAsset) => void;
+  anchor: AnchorRect | null;
+}
+
+const TextElementEditor: React.FC<TextElementEditorProps> = ({
+  element,
+  label,
+  draft,
+  onApply,
+  onClose,
+  fontOptions,
+  onAssetAdded,
+  anchor,
+}) => {
+  const formId = `${element.replace(/\./g, '-')}-text-form`;
+  const initialPlain = getPlainTextValue(draft, element);
+  const initialRichText = getElementRichTextValue(draft, element);
+  const elementStyle = getElementStyle(draft, element);
+
+  const [plainText, setPlainText] = useState<string>(initialPlain);
+  const [richText, setRichText] = useState<RichTextValue | null>(initialRichText);
+  const [fontFamily, setFontFamily] = useState<string>(elementStyle.fontFamily ?? '');
+  const [fontSize, setFontSize] = useState<string>(elementStyle.fontSize ?? '');
+  const [textColor, setTextColor] = useState<string>(elementStyle.textColor ?? '');
+  const [backgroundColor, setBackgroundColor] = useState<string>(elementStyle.backgroundColor ?? '');
+  const [fontUploadError, setFontUploadError] = useState<string | null>(null);
+  const [uploadingFont, setUploadingFont] = useState<boolean>(false);
+
+  useEffect(() => {
+    setPlainText(initialPlain);
+    setRichText(initialRichText);
+    setFontFamily(elementStyle.fontFamily ?? '');
+    setFontSize(elementStyle.fontSize ?? '');
+    setTextColor(elementStyle.textColor ?? '');
+    setBackgroundColor(elementStyle.backgroundColor ?? '');
+  }, [initialPlain, initialRichText, elementStyle.fontFamily, elementStyle.fontSize, elementStyle.textColor, elementStyle.backgroundColor]);
+
+  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const sanitizedPlain = plainText;
+
+    onApply(current => {
+      setNestedValue(current, element, sanitizedPlain);
+      applyElementRichText(current, element, richText);
+      applyElementStyleOverrides(current, element, {
+        fontFamily,
+        fontSize,
+        textColor,
+        backgroundColor,
+      });
+      return current;
+    });
+    onClose();
+  };
+
+  const handleFontUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) {
+      return;
+    }
+    setFontUploadError(null);
+    setUploadingFont(true);
+    try {
+      const url = await uploadCustomizationAsset(file, { tags: [guessAssetType(file)] });
+      const asset = createAssetFromFile(file, url);
+      onAssetAdded(asset);
+      setFontFamily(asset.name);
+    } catch (err) {
+      setFontUploadError(
+        err instanceof Error ? err.message : 'Impossible de téléverser la police. Réessayez plus tard.',
+      );
+    } finally {
+      setUploadingFont(false);
+      event.target.value = '';
+    }
+  };
+
+  const footer = (
+    <>
+      <button type="button" onClick={onClose} className="ui-btn-secondary">Annuler</button>
+      <button type="submit" form={formId} className="ui-btn-primary">Enregistrer</button>
+    </>
+  );
+
+  return (
+    <EditorPopover
+      title={`Personnaliser ${label}`}
+      onClose={onClose}
+      footer={footer}
+      anchor={anchor}
+      elementId={element}
+    >
+      <form id={formId} onSubmit={handleSubmit} className="space-y-6">
+        <div>
+          <label htmlFor={`${formId}-plain`} className="block text-sm font-medium text-slate-700">
+            Texte de base
+          </label>
+          <textarea
+            id={`${formId}-plain`}
+            className="ui-textarea mt-2 w-full"
+            value={plainText}
+            onChange={event => {
+              setPlainText(event.target.value);
+              setRichText(null);
+            }}
+            rows={3}
+          />
+        </div>
+        <div>
+          <p className="text-sm font-medium text-slate-700">Mise en forme avancée</p>
+          <RichTextEditor
+            id={`${formId}-rich`}
+            value={richText}
+            fallback={plainText}
+            onChange={value => {
+              setRichText(value);
+              if (value) {
+                setPlainText(value.plainText);
+              }
+            }}
+            className="mt-2"
+            placeholder="Saisissez votre texte..."
+          />
+          <button
+            type="button"
+            className="mt-2 text-sm font-medium text-brand-primary hover:text-brand-primary/80"
+            onClick={() => setRichText(null)}
+          >
+            Supprimer la mise en forme personnalisée
+          </button>
+        </div>
+        <div className="grid gap-4 md:grid-cols-2">
+          <div>
+            <label htmlFor={`${formId}-font`} className="block text-sm font-medium text-slate-700">
+              Police
+            </label>
+            <input
+              id={`${formId}-font`}
+              className="ui-input mt-2 w-full"
+              value={fontFamily}
+              onChange={event => setFontFamily(event.target.value)}
+              list={`${formId}-font-options`}
+              placeholder="Ex: Poppins"
+            />
+            <datalist id={`${formId}-font-options`}>
+              {fontOptions.map(option => (
+                <option key={option} value={option} />
+              ))}
+            </datalist>
+            <div className="mt-2 flex items-center gap-3">
+              <label className="ui-btn-secondary relative cursor-pointer">
+                <input
+                  type="file"
+                  accept=".woff,.woff2,.ttf,.otf"
+                  className="absolute inset-0 cursor-pointer opacity-0"
+                  onChange={handleFontUpload}
+                  disabled={uploadingFont}
+                />
+                <Upload className="mr-2 h-4 w-4" aria-hidden="true" />
+                Importer une police
+              </label>
+              {uploadingFont && <Loader2 className="h-4 w-4 animate-spin text-brand-primary" aria-hidden="true" />}
+            </div>
+            {fontUploadError && <p className="mt-2 text-sm text-amber-600">{fontUploadError}</p>}
+          </div>
+          <div>
+            <label htmlFor={`${formId}-size`} className="block text-sm font-medium text-slate-700">
+              Taille du texte
+            </label>
+            <input
+              id={`${formId}-size`}
+              className="ui-input mt-2 w-full"
+              value={fontSize}
+              onChange={event => setFontSize(event.target.value)}
+              list={`${formId}-size-options`}
+              placeholder="Ex: 18px"
+            />
+            <datalist id={`${formId}-size-options`}>
+              {FONT_SIZE_SUGGESTIONS.map(size => (
+                <option key={size} value={size} />
+              ))}
+            </datalist>
+          </div>
+        </div>
+        <div className="grid gap-4 md:grid-cols-2">
+          <div>
+            <label htmlFor={`${formId}-text-color`} className="block text-sm font-medium text-slate-700">
+              Couleur du texte
+            </label>
+            <div className="mt-2 flex items-center gap-3">
+              <input
+                id={`${formId}-text-color`}
+                className="ui-input w-full"
+                value={textColor}
+                onChange={event => setTextColor(event.target.value)}
+                placeholder="Ex: #0f172a"
+              />
+              <input
+                type="color"
+                className="h-10 w-10 rounded border border-slate-200"
+                value={textColor || '#000000'}
+                onChange={event => setTextColor(event.target.value)}
+                aria-label="Choisir la couleur du texte"
+              />
+            </div>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {COLOR_SUGGESTIONS.map(color => (
+                <button
+                  key={color}
+                  type="button"
+                  onClick={() => setTextColor(color)}
+                  className="h-8 w-8 rounded-full border border-slate-200"
+                  style={{ backgroundColor: color === 'transparent' ? '#ffffff' : color }}
+                  title={color}
+                />
+              ))}
+            </div>
+          </div>
+          <div>
+            <label htmlFor={`${formId}-bg-color`} className="block text-sm font-medium text-slate-700">
+              Couleur de fond
+            </label>
+            <div className="mt-2 flex items-center gap-3">
+              <input
+                id={`${formId}-bg-color`}
+                className="ui-input w-full"
+                value={backgroundColor}
+                onChange={event => setBackgroundColor(event.target.value)}
+                placeholder="Ex: rgba(255,255,255,0.8)"
+              />
+              <input
+                type="color"
+                className="h-10 w-10 rounded border border-slate-200"
+                value={backgroundColor || '#ffffff'}
+                onChange={event => setBackgroundColor(event.target.value)}
+                aria-label="Choisir la couleur d'arrière-plan"
+              />
+            </div>
+          </div>
+        </div>
+        <div className="flex items-center justify-between border-t border-slate-200 pt-4">
+          <p className="text-sm text-slate-500">Laissez un champ vide pour hériter du style par défaut.</p>
+          <button
+            type="button"
+            className="text-sm font-medium text-brand-primary hover:text-brand-primary/80"
+            onClick={() => {
+              setFontFamily('');
+              setFontSize('');
+              setTextColor('');
+              setBackgroundColor('');
+            }}
+          >
+            Réinitialiser le style
+          </button>
+        </div>
+      </form>
+    </EditorPopover>
+  );
+};
+
+interface ImageElementEditorProps {
+  element: EditableElementKey;
+  label: string;
+  draft: SiteContent;
+  onApply: (updater: DraftUpdater) => void;
+  onClose: () => void;
+  onAssetAdded: (asset: CustomizationAsset) => void;
+  anchor: AnchorRect | null;
+}
+
+const ImageElementEditor: React.FC<ImageElementEditorProps> = ({
+  element,
+  label,
+  draft,
+  onApply,
+  onClose,
+  onAssetAdded,
+  anchor,
+}) => {
+  const formId = `${element.replace(/\./g, '-')}-image-form`;
+  const initialImage = getImageValue(draft, element) ?? '';
+  const [imageUrl, setImageUrl] = useState<string>(initialImage);
+  const [error, setError] = useState<string | null>(null);
+  const [uploading, setUploading] = useState<boolean>(false);
+
+  useEffect(() => {
+    setImageUrl(initialImage);
+  }, [initialImage]);
+
+  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const trimmed = imageUrl.trim();
+    const normalized = normalizeCloudinaryImageUrl(trimmed) ?? (trimmed.length > 0 ? trimmed : null);
+
+    onApply(current => {
+      setNestedValue(current, element, normalized);
+      return current;
+    });
+    onClose();
+  };
+
+  const handleUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) {
+      return;
+    }
+    setError(null);
+    setUploading(true);
+    try {
+      const url = await uploadCustomizationAsset(file, { tags: [guessAssetType(file)] });
+      const asset = createAssetFromFile(file, url);
+      onAssetAdded(asset);
+      setImageUrl(url);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Téléversement impossible. Vérifiez votre connexion.");
+    } finally {
+      setUploading(false);
+      event.target.value = '';
+    }
+  };
+
+  const footer = (
+    <>
+      <button type="button" onClick={onClose} className="ui-btn-secondary">Annuler</button>
+      <button type="submit" form={formId} className="ui-btn-primary">Enregistrer</button>
+    </>
+  );
+
+  const previewUrl = imageUrl.trim();
+
+  return (
+    <EditorPopover
+      title={`Personnaliser ${label}`}
+      onClose={onClose}
+      footer={footer}
+      anchor={anchor}
+      elementId={element}
+    >
+      <form id={formId} onSubmit={handleSubmit} className="space-y-6">
+        <div>
+          <label htmlFor={`${formId}-input`} className="block text-sm font-medium text-slate-700">
+            URL de l'image
+          </label>
+          <input
+            id={`${formId}-input`}
+            className="ui-input mt-2 w-full"
+            value={imageUrl}
+            onChange={event => setImageUrl(event.target.value)}
+            placeholder="https://..."
+          />
+          <p className="mt-2 text-xs text-slate-500">
+            Fournissez une URL Cloudinary ou téléversez un fichier pour l'ajouter automatiquement.
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-3">
+          <label className="ui-btn-secondary relative cursor-pointer">
+            <input
+              type="file"
+              accept="image/*,video/*,audio/*,.ttf,.otf,.woff,.woff2"
+              className="absolute inset-0 cursor-pointer opacity-0"
+              onChange={handleUpload}
+              disabled={uploading}
+            />
+            <Upload className="mr-2 h-4 w-4" aria-hidden="true" />
+            Importer un média
+          </label>
+          {uploading && <Loader2 className="h-4 w-4 animate-spin text-brand-primary" aria-hidden="true" />}
+          <button
+            type="button"
+            onClick={() => setImageUrl('')}
+            className="text-sm font-medium text-brand-primary hover:text-brand-primary/80"
+          >
+            Supprimer le média
+          </button>
+        </div>
+        {error && (
+          <div className="flex items-start gap-2 rounded-2xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-700">
+            <AlertTriangle className="mt-0.5 h-4 w-4" aria-hidden="true" />
+            <p>{error}</p>
+          </div>
+        )}
+        {previewUrl && (
+          <div className="overflow-hidden rounded-2xl border border-slate-200">
+            <img src={previewUrl} alt="Aperçu" className="h-56 w-full object-cover" />
+          </div>
+        )}
+      </form>
+    </EditorPopover>
+  );
+};
+
+interface BackgroundElementEditorProps {
+  element: EditableElementKey;
+  label: string;
+  draft: SiteContent;
+  onApply: (updater: DraftUpdater) => void;
+  onClose: () => void;
+  onAssetAdded: (asset: CustomizationAsset) => void;
+  anchor: AnchorRect | null;
+}
+
+const BackgroundElementEditor: React.FC<BackgroundElementEditorProps> = ({
+  element,
+  label,
+  draft,
+  onApply,
+  onClose,
+  onAssetAdded,
+  anchor,
+}) => {
+  const formId = `${element.replace(/\./g, '-')}-background-form`;
+  const background = getSectionBackground(draft, element);
+  const [backgroundType, setBackgroundType] = useState<SectionStyle['background']['type']>(background.type);
+  const [color, setColor] = useState<string>(background.color);
+  const [imageUrl, setImageUrl] = useState<string>(background.image ?? '');
+  const [error, setError] = useState<string | null>(null);
+  const [uploading, setUploading] = useState<boolean>(false);
+
+  useEffect(() => {
+    setBackgroundType(background.type);
+    setColor(background.color);
+    setImageUrl(background.image ?? '');
+  }, [background.type, background.color, background.image]);
+
+  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const trimmedColor = color.trim() || 'transparent';
+    const trimmedImage = imageUrl.trim();
+    const normalizedImage = normalizeCloudinaryImageUrl(trimmedImage) ?? (trimmedImage.length > 0 ? trimmedImage : null);
+
+    onApply(current => {
+      applySectionBackground(current, element, {
+        type: backgroundType,
+        color: trimmedColor,
+        image: backgroundType === 'image' ? normalizedImage : null,
+      });
+      return current;
+    });
+    onClose();
+  };
+
+  const handleUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) {
+      return;
+    }
+    setError(null);
+    setUploading(true);
+    try {
+      const url = await uploadCustomizationAsset(file, { tags: [guessAssetType(file)] });
+      const asset = createAssetFromFile(file, url);
+      onAssetAdded(asset);
+      setImageUrl(url);
+      setBackgroundType('image');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Téléversement impossible.');
+    } finally {
+      setUploading(false);
+      event.target.value = '';
+    }
+  };
+
+  const footer = (
+    <>
+      <button type="button" onClick={onClose} className="ui-btn-secondary">Annuler</button>
+      <button type="submit" form={formId} className="ui-btn-primary">Enregistrer</button>
+    </>
+  );
+
+  const previewUrl = imageUrl.trim();
+
+  return (
+    <EditorPopover
+      title={`Personnaliser ${label}`}
+      onClose={onClose}
+      footer={footer}
+      anchor={anchor}
+      elementId={element}
+    >
+      <form id={formId} onSubmit={handleSubmit} className="space-y-6">
+        <div className="flex gap-3">
+          <button
+            type="button"
+            className={`ui-btn-secondary flex-1 ${backgroundType === 'color' ? 'ring-2 ring-brand-primary' : ''}`}
+            onClick={() => setBackgroundType('color')}
+          >
+            Couleur
+          </button>
+          <button
+            type="button"
+            className={`ui-btn-secondary flex-1 ${backgroundType === 'image' ? 'ring-2 ring-brand-primary' : ''}`}
+            onClick={() => setBackgroundType('image')}
+          >
+            Image
+          </button>
+        </div>
+        <div>
+          <label htmlFor={`${formId}-color`} className="block text-sm font-medium text-slate-700">
+            Couleur
+          </label>
+          <div className="mt-2 flex items-center gap-3">
+            <input
+              id={`${formId}-color`}
+              className="ui-input w-full"
+              value={color}
+              onChange={event => setColor(event.target.value)}
+              placeholder="Ex: rgba(15,23,42,0.75)"
+            />
+            <input
+              type="color"
+              className="h-10 w-10 rounded border border-slate-200"
+              value={color || '#ffffff'}
+              onChange={event => setColor(event.target.value)}
+              aria-label="Choisir la couleur d'arrière-plan"
+            />
+          </div>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {COLOR_SUGGESTIONS.map(option => (
+              <button
+                key={option}
+                type="button"
+                onClick={() => setColor(option)}
+                className="h-8 w-8 rounded-full border border-slate-200"
+                style={{ backgroundColor: option === 'transparent' ? '#ffffff' : option }}
+                title={option}
+              />
+            ))}
+          </div>
+        </div>
+        {backgroundType === 'image' && (
+          <div className="space-y-4">
+            <div>
+              <label htmlFor={`${formId}-image`} className="block text-sm font-medium text-slate-700">
+                URL de l'image
+              </label>
+              <input
+                id={`${formId}-image`}
+                className="ui-input mt-2 w-full"
+                value={imageUrl}
+                onChange={event => setImageUrl(event.target.value)}
+                placeholder="https://..."
+              />
+            </div>
+            <div className="flex flex-wrap items-center gap-3">
+              <label className="ui-btn-secondary relative cursor-pointer">
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="absolute inset-0 cursor-pointer opacity-0"
+                  onChange={handleUpload}
+                  disabled={uploading}
+                />
+                <Upload className="mr-2 h-4 w-4" aria-hidden="true" />
+                Importer une image
+              </label>
+              {uploading && <Loader2 className="h-4 w-4 animate-spin text-brand-primary" aria-hidden="true" />}
+              <button
+                type="button"
+                onClick={() => setImageUrl('')}
+                className="text-sm font-medium text-brand-primary hover:text-brand-primary/80"
+              >
+                Retirer l'image
+              </button>
+            </div>
+            {error && (
+              <div className="flex items-start gap-2 rounded-2xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-700">
+                <AlertTriangle className="mt-0.5 h-4 w-4" aria-hidden="true" />
+                <p>{error}</p>
+              </div>
+            )}
+            {previewUrl && (
+              <div className="overflow-hidden rounded-2xl border border-slate-200">
+                <img src={previewUrl} alt="Aperçu" className="h-48 w-full object-cover" />
+              </div>
+            )}
+          </div>
+        )}
+      </form>
+    </EditorPopover>
+  );
+};
 
 const SiteCustomization: React.FC = () => {
-  // Implémentation du composant principal...
-  return <div>Contenu de la page de personnalisation</div>;
+  const { content, loading, error, updateContent } = useSiteContent();
+  const [draft, setDraft] = useState<SiteContent | null>(() =>
+    content ? cloneSiteContent(content) : null,
+  );
+  const [activeElement, setActiveElement] = useState<EditableElementKey | null>(null);
+  const [activeZone, setActiveZone] = useState<EditableZoneKey | null>(null);
+  const [activeTab, setActiveTab] = useState<TabId>('custom');
+  const [activeAnchor, setActiveAnchor] = useState<AnchorRect | null>(null);
+  const [saving, setSaving] = useState<boolean>(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [saveSuccess, setSaveSuccess] = useState<string | null>(null);
+  const [bestSellerProducts, setBestSellerProducts] = useState<Product[]>([]);
+  const [bestSellerLoading, setBestSellerLoading] = useState<boolean>(false);
+  const [bestSellerError, setBestSellerError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (content) {
+      setDraft(cloneSiteContent(content));
+    }
+  }, [content]);
+
+  useEffect(() => {
+    let mounted = true;
+    const fetchBestSellers = async () => {
+      setBestSellerLoading(true);
+      setBestSellerError(null);
+      try {
+        const products = await api.getBestSellerProducts();
+        if (mounted) {
+          setBestSellerProducts(products);
+        }
+      } catch (err) {
+        if (mounted) {
+          setBestSellerError(
+            err instanceof Error
+              ? err.message
+              : 'Impossible de charger les produits mis en avant.',
+          );
+        }
+      } finally {
+        if (mounted) {
+          setBestSellerLoading(false);
+        }
+      }
+    };
+
+    void fetchBestSellers();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!saveSuccess) {
+      return;
+    }
+    const timeout = setTimeout(() => setSaveSuccess(null), 4000);
+    return () => clearTimeout(timeout);
+  }, [saveSuccess]);
+
+  const applyDraftUpdate = useCallback(
+    (updater: DraftUpdater) => {
+      setDraft(prev => {
+        if (!prev) {
+          return prev;
+        }
+        const clone = cloneSiteContent(prev);
+        return updater(clone);
+      });
+    },
+    [],
+  );
+
+  const appendAssetToDraft = useCallback((asset: CustomizationAsset) => {
+    setDraft(prev => {
+      if (!prev) {
+        return prev;
+      }
+      const clone = cloneSiteContent(prev);
+      appendAsset(clone, asset);
+      return clone;
+    });
+  }, []);
+
+  const handleEdit = useCallback(
+    (
+      element: EditableElementKey,
+      meta: { zone: EditableZoneKey; anchor: DOMRect | DOMRectReadOnly | null },
+    ) => {
+      setActiveElement(element);
+      setActiveZone(meta.zone);
+      setActiveAnchor(cloneAnchorRect(meta.anchor));
+    },
+    [],
+  );
+
+  const closeEditor = useCallback(() => {
+    setActiveElement(null);
+    setActiveZone(null);
+    setActiveAnchor(null);
+  }, []);
+
+  const handleSave = async () => {
+    setSaving(true);
+    setSaveError(null);
+    setSaveSuccess(null);
+    try {
+      if (!draft) {
+        throw new Error('Le brouillon est indisponible.');
+      }
+      const updated = await updateContent(draft);
+      setDraft(updated);
+      setSaveSuccess('Modifications enregistrées avec succès.');
+    } catch (err) {
+      setSaveError(
+        err instanceof Error ? err.message : 'Une erreur est survenue lors de la sauvegarde.',
+      );
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const fontOptions = useMemo(() => {
+    const base = Array.from(FONT_FAMILY_SUGGESTIONS);
+    if (!draft) {
+      return base;
+    }
+    const custom = draft.assets.library
+      .filter(asset => asset.type === 'font')
+      .map(asset => sanitizeFontFamilyName(asset.name));
+    return Array.from(new Set([...base, ...custom]));
+  }, [draft]);
+
+  const activeLabel = activeElement ? ELEMENT_LABELS[activeElement] ?? activeElement : null;
+  const elementType = activeElement
+    ? BACKGROUND_ELEMENT_KEYS.has(activeElement)
+      ? 'background'
+      : IMAGE_ELEMENT_KEYS.has(activeElement)
+      ? 'image'
+      : TEXT_ELEMENT_KEYS.has(activeElement)
+      ? 'text'
+      : 'text'
+    : null;
+
+  if (loading) {
+    return (
+      <div className="flex h-full min-h-[60vh] flex-col items-center justify-center gap-3">
+        <Loader2 className="h-10 w-10 animate-spin text-brand-primary" aria-hidden="true" />
+        <p className="text-sm text-slate-500">Chargement du contenu du site…</p>
+      </div>
+    );
+  }
+
+  if (!content || !draft) {
+    return (
+      <div className="flex h-full min-h-[60vh] flex-col items-center justify-center gap-3">
+        <AlertTriangle className="h-6 w-6 text-amber-500" aria-hidden="true" />
+        <p className="text-sm text-slate-500">Le contenu du site est en cours d'initialisation…</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-8 px-4 sm:px-6 lg:px-0">
+      <header className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold text-slate-900">Site public</h1>
+          <p className="text-sm text-slate-500">
+            Cliquez sur l'icône en forme de crayon pour personnaliser chaque bloc de contenu, image ou logo.
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-3">
+          {saveSuccess && (
+            <div className="flex items-center gap-2 rounded-full bg-emerald-50 px-4 py-2 text-sm text-emerald-700">
+              <CheckCircle2 className="h-4 w-4" aria-hidden="true" />
+              {saveSuccess}
+            </div>
+          )}
+          {saveError && (
+            <div className="flex items-center gap-2 rounded-full bg-amber-50 px-4 py-2 text-sm text-amber-700">
+              <AlertTriangle className="h-4 w-4" aria-hidden="true" />
+              {saveError}
+            </div>
+          )}
+          <button
+            type="button"
+            onClick={handleSave}
+            className="ui-btn-primary"
+            disabled={saving}
+          >
+            {saving ? 'Enregistrement…' : 'Enregistrer les modifications'}
+          </button>
+        </div>
+      </header>
+
+      {error && (
+        <div className="flex items-start gap-3 rounded-3xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-700">
+          <AlertTriangle className="h-5 w-5" aria-hidden="true" />
+          <div>
+            <p>{error}</p>
+            <p className="mt-1">Les valeurs affichées correspondent à la configuration par défaut.</p>
+          </div>
+        </div>
+      )}
+
+      <nav className="flex w-full items-center gap-2 overflow-x-auto rounded-full bg-slate-100 p-1">
+        {TABS.map(tab => (
+          <button
+            key={tab.id}
+            type="button"
+            onClick={() => setActiveTab(tab.id)}
+            className={`flex-1 rounded-full px-4 py-2 text-sm font-medium transition ${
+              activeTab === tab.id
+                ? 'bg-white text-slate-900 shadow'
+                : 'text-slate-500 hover:text-slate-700'
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </nav>
+
+      <div>
+        {activeTab === 'preview' ? (
+          <div className="mx-auto w-full max-w-6xl">
+            <div className="rounded-[2.5rem] border border-slate-200 bg-slate-50 p-6">
+              <SitePreviewCanvas
+                content={draft}
+                bestSellerProducts={bestSellerProducts}
+                onEdit={() => undefined}
+                activeZone={null}
+                showEditButtons={false}
+              />
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {bestSellerError && (
+              <div className="flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-700">
+                <AlertTriangle className="h-5 w-5" aria-hidden="true" />
+                <p>{bestSellerError}</p>
+              </div>
+            )}
+            <div className="mx-auto w-full max-w-6xl">
+              <SitePreviewCanvas
+                content={draft}
+                bestSellerProducts={bestSellerProducts}
+                onEdit={(element, meta) => handleEdit(element, meta)}
+                activeZone={activeZone}
+              />
+            </div>
+            {bestSellerLoading && (
+              <div className="flex items-center gap-2 text-sm text-slate-500">
+                <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                Chargement des produits populaires…
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {activeElement && elementType === 'text' && activeLabel && (
+        <TextElementEditor
+          element={activeElement}
+          label={activeLabel}
+          draft={draft}
+          onApply={applyDraftUpdate}
+          onClose={closeEditor}
+          fontOptions={fontOptions}
+          onAssetAdded={appendAssetToDraft}
+          anchor={activeAnchor}
+        />
+      )}
+
+      {activeElement && elementType === 'image' && activeLabel && (
+        <ImageElementEditor
+          element={activeElement}
+          label={activeLabel}
+          draft={draft}
+          onApply={applyDraftUpdate}
+          onClose={closeEditor}
+          onAssetAdded={appendAssetToDraft}
+          anchor={activeAnchor}
+        />
+      )}
+
+      {activeElement && elementType === 'background' && activeLabel && (
+        <BackgroundElementEditor
+          element={activeElement}
+          label={activeLabel}
+          draft={draft}
+          onApply={applyDraftUpdate}
+          onClose={closeEditor}
+          onAssetAdded={appendAssetToDraft}
+          anchor={activeAnchor}
+        />
+      )}
+    </div>
+  );
 };
 
 export default SiteCustomization;

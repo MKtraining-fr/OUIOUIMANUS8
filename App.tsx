@@ -1,5 +1,9 @@
-import React from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
+import CustomerOrderTracker from './components/CustomerOrderTracker';
+import { getActiveCustomerOrder, clearActiveCustomerOrder, storeActiveCustomerOrder } from './services/customerOrderStorage';
+import useSiteContent from './hooks/useSiteContent';
+import { createHeroBackgroundStyle } from './utils/siteStyleHelpers';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import ProtectedLayout from './pages/ProtectedLayout';
 import Login from './pages/Login';
@@ -56,11 +60,45 @@ const PrivateRoute: React.FC<{ children: React.ReactElement; permissionKey?: str
 
 const RootRoute: React.FC = () => {
   const { role, loading, logout } = useAuth();
+  const navigate = useNavigate();
+  const [activeOrderId, setActiveOrderId] = useState<string | null>(() => getActiveCustomerOrder());
+  const { content: siteContent } = useSiteContent();
+
+  useEffect(() => {
+    const checkActiveOrder = () => {
+      setActiveOrderId(getActiveCustomerOrder());
+    };
+    window.addEventListener("storage", checkActiveOrder); // Listen for changes in localStorage
+    return () => window.removeEventListener("storage", checkActiveOrder);
+  }, []);
+
+  const handleNewOrder = () => {
+    clearActiveCustomerOrder();
+    setActiveOrderId(null);
+    navigate("/"); // Navigate to home to refresh the view
+  };
 
   if (loading) {
     return <LoadingScreen />;
   }
 
+  // If there's an active order, display the tracker on the home page
+  if (activeOrderId) {
+    const heroBackgroundStyle = siteContent 
+      ? createHeroBackgroundStyle(siteContent.hero.style, siteContent.hero.backgroundImage)
+      : {};
+    return (
+      <div className="min-h-screen" style={heroBackgroundStyle}>
+        <CustomerOrderTracker 
+          orderId={activeOrderId} 
+          onNewOrderClick={handleNewOrder} 
+          variant="hero" 
+        />
+      </div>
+    );
+  }
+
+  // If no active order, proceed with original logic (login or redirect based on role)
   if (!role) {
     return <Login />;
   }

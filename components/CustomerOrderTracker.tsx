@@ -138,11 +138,16 @@ const CustomerOrderTracker: React.FC<CustomerOrderTrackerProps> = ({ orderId, on
     }
 
     if (!order) {
+        // If order is not found and variant is hero (on home page), display nothing or a subtle message
+        if (variant === 'hero') {
+            return null; // Or a subtle message like 'No active order found.'
+        }
+        // For 'page' variant (on /commande-client), display the original message
         return (
             <div className={containerClasses}>
                 <div className={contentClasses}>
-                    <h2 className={`text-2xl font-bold mb-4 ${variant === 'hero' ? 'text-red-400' : 'text-red-600'}`}>Commande non trouvée</h2>
-                    <p className={`${variant === 'hero' ? 'text-gray-200' : 'text-gray-600'} mb-6`}>Nous n'avons pas pu retrouver votre commande.</p>
+                    <h2 className={`text-2xl font-bold mb-4 text-red-600`}>Commande non trouvée</h2>
+                    <p className={`text-gray-600 mb-6`}>Nous n'avons pas pu retrouver votre commande.</p>
                     <button onClick={onNewOrderClick} className="bg-brand-primary text-brand-secondary font-bold py-3 px-6 rounded-lg hover:bg-yellow-400 transition">
                         Passer une nouvelle commande
                     </button>
@@ -225,8 +230,8 @@ const CustomerOrderTracker: React.FC<CustomerOrderTrackerProps> = ({ orderId, on
                             <button onClick={onNewOrderClick} className={`${variant === 'hero' ? 'bg-gray-200 text-gray-800' : 'bg-brand-primary text-brand-secondary'} font-bold py-3 px-6 rounded-lg hover:bg-gray-300 transition`}>
                                 Nouvelle commande
                             </button>
-                            <button onClick={onNewOrderClick} className="text-sm text-gray-500 hover:underline">
-                                Volver al menu
+                            <button onClick={() => { onNewOrderClick(); window.location.href = '/'; }} className="text-sm text-gray-500 hover:underline">
+                                Volver
                             </button>
                         </div>
                     ) : (
@@ -234,8 +239,8 @@ const CustomerOrderTracker: React.FC<CustomerOrderTrackerProps> = ({ orderId, on
                             <p className={`text-sm ${variant === 'hero' ? 'text-gray-300' : 'text-gray-600'}`}>
                                 Le statut de votre commande est mis à jour automatiquement.
                             </p>
-                            <button onClick={onNewOrderClick} className="text-sm text-gray-500 hover:underline">
-                                Volver al menu
+                            <button onClick={() => { onNewOrderClick(); window.location.href = '/'; }} className="text-sm text-gray-500 hover:underline">
+                                Volver
                             </button>
                         </div>
                     )}

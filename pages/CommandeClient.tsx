@@ -494,34 +494,10 @@ const OrderMenuView: React.FC<OrderMenuViewProps> = ({ onOrderSubmitted }) => {
         );
     };
 
-    const navigate = useNavigate();
-
-    const handleGoBack = () => {
-        if (cart.length > 0) {
-            const confirmed = window.confirm('¿Estás seguro de que quieres volver? Tu carrito será vaciado.');
-            if (!confirmed) return;
-        }
-        navigate('/');
-    };
-
-    // Créer le style de fond basé sur le HERO
-    const heroBackgroundStyle = siteContent 
-        ? createHeroBackgroundStyle(siteContent.hero.style, siteContent.hero.backgroundImage)
-        : {};
-
     return (
-        <div className="min-h-screen flex flex-col lg:flex-row" style={heroBackgroundStyle}>
+        <div className="flex flex-col lg:flex-row">
             {/* Main Content */}
             <div className="flex-1 p-4 lg:p-8">
-                {/* Back Button */}
-                <button
-                    onClick={handleGoBack}
-                    className="flex items-center text-brand-primary hover:text-brand-primary-dark font-medium mb-4 transition-colors"
-                >
-                    <ArrowLeft size={20} className="mr-2" />
-                    Volver
-                </button>
-
                 {/* Pedido Anterior - Displayed in Hero section */}
                 {orderHistory.length > 0 && (
                     <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg max-w-md">
@@ -828,7 +804,9 @@ const OrderMenuView: React.FC<OrderMenuViewProps> = ({ onOrderSubmitted }) => {
 
 // Main wrapper component that handles order tracking
 const CommandeClient: React.FC = () => {
+    const navigate = useNavigate();
     const [activeOrderId, setActiveOrderId] = useState<string | null>(() => getActiveCustomerOrder());
+    const { content: siteContent } = useSiteContent();
 
     const handleOrderSubmitted = (order: Order) => {
         setActiveOrderId(order.id);
@@ -839,8 +817,38 @@ const CommandeClient: React.FC = () => {
         setActiveOrderId(null);
     };
 
+    // Create Hero background style for the entire page
+    const heroBackgroundStyle = siteContent 
+        ? createHeroBackgroundStyle(siteContent.hero.style, siteContent.hero.backgroundImage)
+        : {};
+
     return (
-        <>
+        <div className="min-h-screen" style={heroBackgroundStyle}>
+            {/* Header with navigation - always visible */}
+            <header className="bg-white/90 backdrop-blur shadow-md p-4 sticky top-0 z-40">
+                <div className="container mx-auto flex justify-between items-center">
+                    <div className="flex items-center gap-3">
+                        {siteContent?.navigation.brandLogo && (
+                            <img
+                                src={siteContent.navigation.brandLogo}
+                                alt={`Logo ${siteContent.navigation.brand}`}
+                                className="h-10 w-10 rounded-full object-cover"
+                            />
+                        )}
+                        <span className="text-2xl font-bold text-gray-800">
+                            {siteContent?.navigation.brand || 'OUIOUITACOS'}
+                        </span>
+                    </div>
+                    <button
+                        onClick={() => navigate('/')}
+                        className="flex items-center gap-2 text-sm font-medium text-gray-700 hover:text-gray-900 transition"
+                    >
+                        <ArrowLeft size={16}/> Volver al inicio
+                    </button>
+                </div>
+            </header>
+
+            {/* Main content area */}
             {activeOrderId ? (
                 <CustomerOrderTracker 
                     orderId={activeOrderId} 
@@ -850,7 +858,7 @@ const CommandeClient: React.FC = () => {
             ) : (
                 <OrderMenuView onOrderSubmitted={handleOrderSubmitted} />
             )}
-        </>
+        </div>
     );
 };
 

@@ -13,19 +13,27 @@ const PromotionBadge: React.FC<PromotionBadgeProps> = ({ promotion, className = 
   const config = promotion.config;
   const visuals = config.visuals || {};
   
-  // Déterminer le texte du badge
+  // Déterminer le texte du badge (plus informatif)
   let badgeText = visuals.badge_text || '';
+  let badgeDescription = visuals.description || promotion.description || '';
   
   if (!badgeText) {
     // Générer un texte par défaut basé sur le type de réduction
     if (config.discount_type === 'percentage') {
       badgeText = `-${config.discount_value}%`;
+      badgeDescription = badgeDescription || `${config.discount_value}% de descuento`;
     } else if (config.discount_type === 'fixed_amount') {
       badgeText = `-$${config.discount_value.toLocaleString()}`;
+      badgeDescription = badgeDescription || `$${config.discount_value.toLocaleString()} de descuento`;
     } else if (config.buy_quantity && config.get_quantity) {
       badgeText = `${config.buy_quantity}x${config.get_quantity}`;
+      badgeDescription = badgeDescription || `Compra ${config.buy_quantity}, lleva ${config.get_quantity}`;
+    } else if (config.applies_to === 'shipping') {
+      badgeText = 'ENVÍO GRATIS';
+      badgeDescription = badgeDescription || 'Envío gratis en este producto';
     } else {
       badgeText = 'PROMO';
+      badgeDescription = badgeDescription || promotion.name;
     }
   }
   
@@ -42,15 +50,22 @@ const PromotionBadge: React.FC<PromotionBadgeProps> = ({ promotion, className = 
     'bottom-right': 'bottom-2 right-2'
   };
   
+  // Vérifier s'il y a une image de fond
+  const backgroundImage = visuals.badge_bg_image;
+  
   return (
     <div
       className={`absolute ${positionClasses[position]} z-10 px-3 py-1 rounded-full font-bold text-sm shadow-lg transform rotate-3 ${className}`}
       style={{
-        backgroundColor: bgColor,
+        backgroundColor: backgroundImage ? 'transparent' : bgColor,
+        backgroundImage: backgroundImage ? `url(${backgroundImage})` : 'none',
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
         color: textColor,
-        animation: 'pulse 2s infinite'
+        animation: 'pulse 2s infinite',
+        textShadow: backgroundImage ? '0 1px 3px rgba(0,0,0,0.8)' : 'none'
       }}
-      title={visuals.description || promotion.description || promotion.name}
+      title={badgeDescription}
     >
       {badgeText}
       

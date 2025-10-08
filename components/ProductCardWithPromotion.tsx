@@ -13,8 +13,8 @@ interface ProductCardWithPromotionProps {
  * Composant de carte produit avec badge promotionnel
  */
 const ProductCardWithPromotion: React.FC<ProductCardWithPromotionProps> = ({ product, onClick }) => {
-  // Récupérer les promotions applicables au produit
-  const { bestPromotion, loading } = useProductPromotions(product);
+  // Récupérer toutes les promotions applicables au produit
+  const { promotions, loading } = useProductPromotions(product);
 
   return (
     <div 
@@ -23,9 +23,13 @@ const ProductCardWithPromotion: React.FC<ProductCardWithPromotionProps> = ({ pro
         product.estado === 'disponible' ? 'cursor-pointer hover:shadow-xl' : 'opacity-50'
       }`}
     >
-      {/* Afficher le badge promotionnel si une promotion est applicable */}
-      {!loading && bestPromotion && product.estado === 'disponible' && (
-        <PromotionBadge promotion={bestPromotion} />
+      {/* Afficher tous les badges promotionnels si des promotions sont applicables */}
+      {!loading && promotions.length > 0 && product.estado === 'disponible' && (
+        <div className="absolute top-2 right-2 flex flex-col space-y-1 z-10">
+          {promotions.map((promotion, index) => (
+            <PromotionBadge key={promotion.id || index} promotion={promotion} />
+          ))}
+        </div>
       )}
       
       {/* Image du produit */}

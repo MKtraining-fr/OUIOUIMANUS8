@@ -8,6 +8,9 @@ import { ShoppingCart, Plus, Minus, History, ArrowLeft } from 'lucide-react';
 import { getActiveCustomerOrder, storeActiveCustomerOrder } from '../utils/storage';
 import ProductCardWithPromotion from '../components/ProductCardWithPromotion';
 import ActivePromotionsDisplay from '../components/ActivePromotionsDisplay';
+import { fetchActivePromotions } from '../services/promotionsApi';
+import useSiteContent from '../hooks/useSiteContent';
+import { createHeroBackgroundStyle } from '../utils/siteStyleHelpers';
 
 const DOMICILIO_FEE = 5000;
 const DOMICILIO_ITEM_NAME = 'Domicilio';
@@ -145,7 +148,7 @@ const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, selectedPr
                     
                     <button
                         onClick={handleAddToCart}
-                        className="w-full bg-brand-primary text-white font-bold py-2 px-4 rounded-lg hover:bg-brand-primary-dark transition"
+                        className="w-full bg-gradient-to-r from-green-500 to-emerald-600 text-white font-bold py-3 px-4 rounded-lg hover:from-green-600 hover:to-emerald-700 transition-all shadow-lg transform hover:scale-105"
                     >
                         Agregar al carrito - {formatCurrencyCOP(selectedProduct.product.prix_vente * quantity)}
                     </button>
@@ -225,6 +228,7 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({ isOpen, order, on
 };
 
 const OrderMenuView: React.FC = () => {
+    const { content: siteContent } = useSiteContent();
     const [products, setProducts] = useState<Product[]>([]);
     const [categories, setCategories] = useState<Category[]>([]);
     const [loading, setLoading] = useState(true);
@@ -240,6 +244,10 @@ const OrderMenuView: React.FC = () => {
     const [confirmOpen, setConfirmOpen] = useState(false);
     const [submittedOrder, setSubmittedOrder] = useState<Order | null>(null);
     const [orderHistory, setOrderHistory] = useState<Order[]>([]);
+    const [promoCode, setPromoCode] = useState<string>('');
+    const [appliedPromoCode, setAppliedPromoCode] = useState<string>('');
+    const [promoCodeError, setPromoCodeError] = useState<string>('');
+    const [promoCodeDiscount, setPromoCodeDiscount] = useState<number>(0);
     
     useEffect(() => {
         const fetchData = async () => {
@@ -284,8 +292,9 @@ const OrderMenuView: React.FC = () => {
         if (cart.length === 0) {
             return subtotal;
         }
-        return subtotal + DOMICILIO_FEE;
-    }, [cart]);
+        const totalWithDelivery = subtotal + DOMICILIO_FEE;
+        return Math.max(0, totalWithDelivery - promoCodeDiscount);
+    }, [cart, promoCodeDiscount]);
 
     const handleProductClick = (product: Product) => {
         setSelectedProduct({product});
@@ -322,6 +331,59 @@ const OrderMenuView: React.FC = () => {
         setCart(newCart);
     };
     
+    const handleApplyPromoCode = async () => {
+        setPromoCodeError('');
+        try {
+            // Fetch all active promotions
+            const promotions = await fetchActivePromotions();
+            
+            // Find promo code promotion
+            const promoCodePromotion = promotions.find(promo => {
+                const config = promo.config as any;
+                return config.promo_code && config.promo_code.toUpperCase() === promoCode.toUpperCase();
+            });
+
+            if (!promoCodePromotion) {
+                setPromoCodeError('Código de promoción inválido');
+                return;
+            }
+
+            // Check conditions
+            const config = promoCodePromotion.config as any;
+            const conditions = promoCodePromotion.conditions as any[];
+            
+            const subtotal = cart.reduce((acc, item) => acc + item.quantite * item.prix_unitaire, 0);
+            const minAmount = conditions.find(c => c.type === 'min_order_amount');
+            
+            if (minAmount && subtotal < minAmount.value) {
+                setPromoCodeError(`Monto mínimo requerido: $${minAmount.value.toLocaleString()}`);
+                return;
+            }
+
+            // Calculate discount
+            let discount = 0;
+            if (config.discount_type === 'percentage') {
+                discount = (subtotal * config.discount_value) / 100;
+            } else if (config.discount_type === 'fixed_amount') {
+                discount = config.discount_value;
+            }
+
+            setAppliedPromoCode(promoCode);
+            setPromoCodeDiscount(discount);
+            setPromoCodeError('');
+        } catch (error) {
+            console.error('Error applying promo code:', error);
+            setPromoCodeError('Error al aplicar el código de promoción');
+        }
+    };
+
+    const handleRemovePromoCode = () => {
+        setPromoCode('');
+        setAppliedPromoCode('');
+        setPromoCodeDiscount(0);
+        setPromoCodeError('');
+    };
+
     const handleSubmitOrder = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!clientInfo.nom || !clientInfo.telephone || !clientInfo.adresse || !paymentProof || !paymentMethod) return;
@@ -412,8 +474,13 @@ const OrderMenuView: React.FC = () => {
         navigate('/');
     };
 
+    // Créer le style de fond basé sur le HERO
+    const heroBackgroundStyle = siteContent 
+        ? createHeroBackgroundStyle(siteContent.hero.style, siteContent.hero.backgroundImage)
+        : {};
+
     return (
-        <div className="min-h-screen bg-gray-100 flex flex-col lg:flex-row">
+        <div className="min-h-screen flex flex-col lg:flex-row" style={heroBackgroundStyle}>
             {/* Main Content */}
             <div className="flex-1 p-4 lg:p-8">
                 {/* Back Button */}
@@ -434,7 +501,7 @@ const OrderMenuView: React.FC = () => {
                 <div className="flex space-x-3 mb-6 overflow-x-auto pb-2">
                     <button
                         onClick={() => setActiveCategoryId("all")}
-                        className={`px-5 py-2 rounded-full text-sm font-bold transition-all ${activeCategoryId === "all" ? "bg-brand-primary text-white shadow-lg scale-105" : "bg-white text-gray-800 shadow-md hover:bg-gray-100 border-2 border-gray-300"}`}
+                        className={`px-5 py-2 rounded-full text-sm font-bold transition-all ${activeCategoryId === "all" ? "bg-gradient-to-r from-orange-500 to-red-500 text-white shadow-lg scale-105 border-2 border-orange-600" : "bg-white text-gray-800 shadow-md hover:bg-gray-100 border-2 border-gray-300"}`}
                     >
                         Todos
                     </button>
@@ -442,7 +509,7 @@ const OrderMenuView: React.FC = () => {
                         <button
                             key={category.id}
                             onClick={() => setActiveCategoryId(category.id)}
-                            className={`px-5 py-2 rounded-full text-sm font-bold transition-all ${activeCategoryId === category.id ? "bg-brand-primary text-white shadow-lg scale-105" : "bg-white text-gray-800 shadow-md hover:bg-gray-100 border-2 border-gray-300"}`}
+                            className={`px-5 py-2 rounded-full text-sm font-bold transition-all ${activeCategoryId === category.id ? "bg-gradient-to-r from-orange-500 to-red-500 text-white shadow-lg scale-105 border-2 border-orange-600" : "bg-white text-gray-800 shadow-md hover:bg-gray-100 border-2 border-gray-300"}`}
                         >
                             {category.nom}
                         </button>
@@ -509,6 +576,48 @@ const OrderMenuView: React.FC = () => {
                 )}
 
                 <div className="mt-auto pt-4 border-t border-gray-200">
+                    {/* Promo Code Input */}
+                    <div className="mb-4">
+                        <label htmlFor="promoCode" className="block text-sm font-medium text-gray-700 mb-2">
+                            Código de Promoción:
+                        </label>
+                        <div className="flex space-x-2">
+                            <input
+                                type="text"
+                                id="promoCode"
+                                value={promoCode}
+                                onChange={(e) => setPromoCode(e.target.value.toUpperCase())}
+                                placeholder="Ingresa tu código"
+                                className="flex-1 border border-gray-300 rounded-md shadow-sm p-2 uppercase"
+                            />
+                            <button
+                                type="button"
+                                onClick={handleApplyPromoCode}
+                                disabled={!promoCode.trim() || appliedPromoCode === promoCode}
+                                className="px-4 py-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white font-bold rounded-md hover:from-purple-600 hover:to-pink-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                            >
+                                Aplicar
+                            </button>
+                        </div>
+                        {appliedPromoCode && (
+                            <div className="mt-2 p-2 bg-green-50 border border-green-200 rounded-md flex items-center justify-between">
+                                <span className="text-sm text-green-700 font-medium">
+                                    ✓ Código "{appliedPromoCode}" aplicado
+                                </span>
+                                <button
+                                    type="button"
+                                    onClick={handleRemovePromoCode}
+                                    className="text-red-500 hover:text-red-700 text-sm font-medium"
+                                >
+                                    Eliminar
+                                </button>
+                            </div>
+                        )}
+                        {promoCodeError && (
+                            <p className="mt-2 text-sm text-red-600">{promoCodeError}</p>
+                        )}
+                    </div>
+
                     <div className="flex justify-between items-center mb-3">
                         <p className="text-lg font-bold text-gray-800">Total:</p>
                         <p className="text-xl font-bold text-brand-primary">{formatCurrencyCOP(total)}</p>

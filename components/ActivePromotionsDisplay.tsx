@@ -22,7 +22,13 @@ const ActivePromotionsDisplay: React.FC = () => {
     loadPromotions();
   }, []);
 
-  if (loading || promotions.length === 0) return null;
+  // Filter out promo code promotions
+  const visiblePromotions = promotions.filter(promo => {
+    const config = promo.config as any;
+    return !config.promo_code;
+  });
+
+  if (loading || visiblePromotions.length === 0) return null;
 
   const getPromotionIcon = (promo: Promotion) => {
     const config = promo.config as any;
@@ -63,7 +69,7 @@ const ActivePromotionsDisplay: React.FC = () => {
         Promociones Activas
       </h3>
       <div className="space-y-2">
-        {promotions.map((promo) => {
+        {visiblePromotions.map((promo) => {
           const config = promo.config as any;
           const bgColor = config.visuals?.badge_bg_color || '#4CAF50';
           

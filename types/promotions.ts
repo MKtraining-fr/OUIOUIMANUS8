@@ -37,6 +37,7 @@ export interface PromotionConfig {
     badge_text?: string; // Texte du badge (ex: "2x1", "-20%")
     badge_color?: string; // Couleur du texte du badge (hex)
     badge_bg_color?: string; // Couleur de fond du badge (hex)
+    badge_bg_image?: string | null; // URL de l'image de fond du badge (Cloudinary)
     badge_position?: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
     banner_image?: string; // URL de l'image de la bannière
     banner_text?: string; // Texte de la bannière

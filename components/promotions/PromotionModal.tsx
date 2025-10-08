@@ -568,15 +568,81 @@ const PromotionModal: React.FC<PromotionModalProps> = ({ isOpen, onClose, onSave
 
               <div>
                 <label htmlFor="badge_color" className="block text-sm font-medium text-gray-700 mb-1">
-                  Couleur du badge
+                  Couleur du texte du badge
                 </label>
                 <input
                   type="color"
                   id="badge_color"
-                  value={visuals.badge_color || '#F9A826'}
+                  value={visuals.badge_color || '#FFFFFF'}
                   onChange={(e) => setVisuals({ ...visuals, badge_color: e.target.value })}
                   className="w-full h-10 px-3 py-2 border border-gray-300 rounded-md"
                 />
+              </div>
+
+              <div>
+                <label htmlFor="badge_bg_color" className="block text-sm font-medium text-gray-700 mb-1">
+                  Couleur de fond du badge
+                </label>
+                <input
+                  type="color"
+                  id="badge_bg_color"
+                  value={visuals.badge_bg_color || '#F9A826'}
+                  onChange={(e) => setVisuals({ ...visuals, badge_bg_color: e.target.value })}
+                  className="w-full h-10 px-3 py-2 border border-gray-300 rounded-md"
+                />
+              </div>
+
+              <div>
+                <label htmlFor="badge_bg_image" className="block text-sm font-medium text-gray-700 mb-1">
+                  Image de fond du badge (optionnel)
+                </label>
+                <p className="text-xs text-gray-500 mb-2">
+                  Si vous uploadez une image, elle remplacera la couleur de fond du badge
+                </p>
+                <div className="flex items-center space-x-4">
+                  <label className="flex items-center justify-center px-4 py-2 border border-gray-300 rounded-md cursor-pointer bg-white hover:bg-gray-50">
+                    <input
+                      type="file"
+                      id="badge_bg_image"
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+
+                        setImageUploading(true);
+                        try {
+                          const url = await uploadCustomizationAsset(file, { tags: ['badge-background'] });
+                          setVisuals({
+                            ...visuals,
+                            badge_bg_image: normalizeCloudinaryImageUrl(url)
+                          });
+                        } catch (err) {
+                          setError('Erreur lors du téléchargement de l\'image du badge');
+                        } finally {
+                          setImageUploading(false);
+                        }
+                      }}
+                      className="sr-only"
+                      accept="image/*"
+                    />
+                    <span>{imageUploading ? 'Téléchargement...' : 'Choisir une image'}</span>
+                  </label>
+                  {visuals.badge_bg_image && (
+                    <div className="relative">
+                      <img
+                        src={visuals.badge_bg_image}
+                        alt="Aperçu de l'image de fond du badge"
+                        className="h-16 w-auto object-cover rounded"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setVisuals({ ...visuals, badge_bg_image: undefined })}
+                        className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1"
+                      >
+                        <X size={12} />
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
 
               <div>

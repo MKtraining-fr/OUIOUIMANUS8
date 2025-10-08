@@ -115,10 +115,10 @@ const Promotions: React.FC = () => {
 
   const handleToggleStatus = async (promotion: Promotion) => {
     try {
-      const newStatus: PromotionStatus = promotion.status === 'active' ? 'inactive' : 'active';
-      await updatePromotionStatus(promotion.id, newStatus);
+      const newStatus = promotion.active ? 'inactive' : 'active';
+      const updatedPromotion = await updatePromotionStatus(promotion.id, newStatus);
       setPromotions(promotions.map(p => 
-        p.id === promotion.id ? { ...p, status: newStatus } : p
+        p.id === promotion.id ? updatedPromotion : p
       ));
     } catch (err) {
       setError('Erreur lors de la mise à jour du statut');

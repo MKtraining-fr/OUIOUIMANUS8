@@ -424,3 +424,12 @@ export const recordPromotionUsagesForOrder = async (order: Order): Promise<void>
     });
   }
 };
+
+/**
+ * Fonction de compatibilité pour l'ancien code utilisant status au lieu de active
+ * @deprecated Utilisez togglePromotionActive à la place
+ */
+export const updatePromotionStatus = async (id: string, status: 'active' | 'inactive' | 'scheduled' | 'expired'): Promise<Promotion> => {
+  const active = status === 'active';
+  return togglePromotionActive(id, active);
+};

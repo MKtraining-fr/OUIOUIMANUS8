@@ -159,3 +159,6 @@ export const isPromotionValidAtTime = (promotion: Promotion): boolean => {
   
   return true;
 };
+
+// Type de compatibilité pour l'ancien code
+export type PromotionStatus = 'active' | 'inactive' | 'scheduled' | 'expired';

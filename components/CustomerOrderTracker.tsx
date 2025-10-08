@@ -268,25 +268,22 @@ const CustomerOrderTracker: React.FC<CustomerOrderTrackerProps> = ({ orderId, on
                             </span>
                         </div>
                     )}
-                    {order.statut === 'finalisee' ? (
-                        <div className="flex flex-col space-y-4">
-                            <button 
-                                onClick={onNewOrderClick} 
-                                className={`${variant === 'hero' ? 'bg-gray-200 text-gray-800' : 'bg-brand-primary text-brand-secondary'} font-bold py-3 px-6 rounded-lg hover:bg-gray-300 transition`}
-                            >
-                                Terminar y volver
-                            </button>
-                        </div>
-                    ) : (
-                        <div className="flex flex-col space-y-4">
-                            <p className={`text-sm ${variant === 'hero' ? 'text-gray-300' : 'text-gray-600'}`}>
-                                Le statut de votre commande est mis à jour automatiquement.
-                            </p>
-                            <button onClick={() => window.location.href = '/'} className="text-sm text-gray-500 hover:underline">
-                                Volver
-                            </button>
-                        </div>
-                    )}
+                    <div className="flex flex-col space-y-4">
+                        <p className={`text-sm ${variant === 'hero' ? 'text-gray-300' : 'text-gray-600'}`}>
+                            Le statut de votre commande est mis à jour automatiquement.
+                        </p>
+                        <button 
+                            onClick={isOrderCompleted ? onNewOrderClick : undefined} 
+                            disabled={!isOrderCompleted}
+                            className={`font-bold py-3 px-6 rounded-lg transition ${
+                                isOrderCompleted 
+                                    ? `${variant === 'hero' ? 'bg-gray-200 text-gray-800 hover:bg-gray-300' : 'bg-brand-primary text-brand-secondary hover:bg-brand-primary-dark'} cursor-pointer` 
+                                    : 'bg-gray-300 text-gray-500 cursor-not-allowed opacity-50'
+                            }`}
+                        >
+                            Volver
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>

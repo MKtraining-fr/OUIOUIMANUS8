@@ -26,11 +26,11 @@ const DOMICILIO_ITEM_NAME = 'Domicilio';
 
 const isDeliveryFeeItem = (item: OrderItem) => item.nom_produit === DOMICILIO_ITEM_NAME;
 
-const createDeliveryFeeItem = (): OrderItem => ({
+const createDeliveryFeeItem = (isFree: boolean = false): OrderItem => ({
     id: `delivery-${Date.now()}`,
     produitRef: 'delivery-fee',
     nom_produit: DOMICILIO_ITEM_NAME,
-    prix_unitaire: DOMICILIO_FEE,
+    prix_unitaire: isFree ? 0 : DOMICILIO_FEE,
     quantite: 1,
     excluded_ingredients: [],
     commentaire: '',
@@ -425,8 +425,9 @@ const OrderMenuView: React.FC<OrderMenuViewProps> = ({ onOrderSubmitted }) => {
             }
 
             // Pour les commandes à emporter, on n'ajoute pas les frais de domicilio
+            // Pour les commandes avec livraison, on ajoute les frais de domicilio (gratuit si isFreeShipping)
             const itemsToSubmit = orderType === 'pedir_en_linea' && cart.length > 0 
-                ? [...cart, createDeliveryFeeItem()] 
+                ? [...cart, createDeliveryFeeItem(isFreeShipping)] 
                 : cart;
 
             const orderData = {

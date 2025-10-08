@@ -82,17 +82,14 @@ const RootRoute: React.FC = () => {
     return <LoadingScreen />;
   }
 
-  // If there's an active order, display the tracker on the home page
+  // If there's an active order, display the tracker on the home page (replacing the Hero)
   if (activeOrderId) {
-    const heroBackgroundStyle = siteContent 
-      ? createHeroBackgroundStyle(siteContent.hero.style, siteContent.hero.backgroundImage)
-      : {};
     return (
-      <div className="min-h-screen" style={heroBackgroundStyle}>
+      <div className="min-h-screen bg-gray-50">
         <CustomerOrderTracker 
           orderId={activeOrderId} 
           onNewOrderClick={handleNewOrder} 
-          variant="hero" 
+          variant="page" 
         />
       </div>
     );

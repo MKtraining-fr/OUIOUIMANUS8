@@ -583,14 +583,23 @@ const Commande: React.FC = () => {
         if (!order) return;
         try {
             let receiptUrl = order.payment_receipt_url ?? undefined;
-            if (receiptFile) {
-                receiptUrl = await uploadPaymentReceipt(receiptFile, { orderId: order.id });
+            
+            // Only upload receipt if a file is provided
+            if (receiptFile && receiptFile instanceof File) {
+                try {
+                    receiptUrl = await uploadPaymentReceipt(receiptFile, { orderId: order.id });
+                } catch (uploadError) {
+                    console.error("Failed to upload receipt", uploadError);
+                    // Continue with finalization even if upload fails
+                    // The receipt can be added later if needed
+                }
             }
+            
             await api.finalizeOrder(order.id, paymentMethod, receiptUrl);
             navigate('/ventes');
         } catch (error) {
             console.error("Failed to finalize order", error);
-            alert("Erreur lors de la finalisation ou du téléversement du justificatif.");
+            alert("Erreur lors de la finalisation de la commande. Veuillez réessayer.");
         }
     };
     

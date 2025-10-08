@@ -22,10 +22,21 @@ const ActivePromotionsDisplay: React.FC = () => {
     loadPromotions();
   }, []);
 
-  // Filter out promo code promotions
+  // Filter out promo code promotions (codes secrets)
   const visiblePromotions = promotions.filter(promo => {
     const config = promo.config as any;
-    return !config.promo_code;
+    const conditions = promo.conditions as any[];
+    
+    // Check if it's a promo code in config
+    if (config.promo_code) return false;
+    
+    // Check if it's a promo code in conditions
+    if (conditions && conditions.some(c => c.type === 'promo_code')) return false;
+    
+    // Check if the description mentions "code promo" or "código"
+    if (promo.description && /code|código|promo code/i.test(promo.description)) return false;
+    
+    return true;
   });
 
   if (loading || visiblePromotions.length === 0) return null;

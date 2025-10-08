@@ -1,17 +1,25 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Product, Category, OrderItem, Order, ClientInfo } from '../types';
+import { Product, Category, OrderItem, Order } from '../types';
+
+// Type pour les informations client
+type ClientInfo = {
+    nom: string;
+    telephone: string;
+    adresse?: string;
+};
 import { api } from '../services/api';
 import { formatCurrencyCOP } from '../utils/formatIntegerAmount';
 import { uploadPaymentReceipt } from '../services/cloudinary';
 import { ShoppingCart, Plus, Minus, History, ArrowLeft } from 'lucide-react';
-import { getActiveCustomerOrder, storeActiveCustomerOrder } from '../utils/storage';
+import { getActiveCustomerOrder, storeActiveCustomerOrder, clearActiveCustomerOrder } from '../utils/storage';
 import ProductCardWithPromotion from '../components/ProductCardWithPromotion';
 import ActivePromotionsDisplay from '../components/ActivePromotionsDisplay';
 import { fetchActivePromotions } from '../services/promotionsApi';
 import useSiteContent from '../hooks/useSiteContent';
 import { createHeroBackgroundStyle } from '../utils/siteStyleHelpers';
 import OrderConfirmationModal from '../components/OrderConfirmationModal';
+import CustomerOrderTracker from '../components/CustomerOrderTracker';
 
 const DOMICILIO_FEE = 8000;
 const DOMICILIO_ITEM_NAME = 'Domicilio';
@@ -24,6 +32,9 @@ const createDeliveryFeeItem = (): OrderItem => ({
     nom_produit: DOMICILIO_ITEM_NAME,
     prix_unitaire: DOMICILIO_FEE,
     quantite: 1,
+    excluded_ingredients: [],
+    commentaire: '',
+    estado: 'en_attente',
 });
 
 interface SelectedProductState {
@@ -228,7 +239,11 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({ isOpen, order, on
     );
 };
 
-const OrderMenuView: React.FC = () => {
+interface OrderMenuViewProps {
+    onOrderSubmitted?: (order: Order) => void;
+}
+
+const OrderMenuView: React.FC<OrderMenuViewProps> = ({ onOrderSubmitted }) => {
     const { content: siteContent } = useSiteContent();
     const [products, setProducts] = useState<Product[]>([]);
     const [categories, setCategories] = useState<Category[]>([]);
@@ -422,6 +437,11 @@ const OrderMenuView: React.FC = () => {
             setPaymentProof(null);
             setPaymentMethod('transferencia');
             storeActiveCustomerOrder(newOrder.id);
+            
+            // Notify parent component that order was submitted
+            if (onOrderSubmitted) {
+                onOrderSubmitted(newOrder);
+            }
         } catch (err) {
             alert('Ocurrió un error al enviar el pedido o subir el comprobante.');
             console.error(err);
@@ -502,6 +522,36 @@ const OrderMenuView: React.FC = () => {
                     Volver
                 </button>
 
+                {/* Pedido Anterior - Displayed in Hero section */}
+                {orderHistory.length > 0 && (
+                    <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg max-w-md">
+                        <p className="text-sm font-semibold text-blue-700 mb-2">Pedido anterior:</p>
+                        {orderHistory.map(order => {
+                            const orderDate = order.created_at ? new Date(order.created_at).toLocaleDateString('es-ES', { 
+                                day: '2-digit', 
+                                month: '2-digit',
+                                year: 'numeric'
+                            }) : 'Fecha no disponible';
+                            
+                            return (
+                                <div key={order.id} className="flex justify-between items-center bg-white p-2 rounded shadow-sm">
+                                    <div className="flex-1">
+                                        <p className="text-xs text-gray-500">{orderDate}</p>
+                                        <p className="text-sm font-bold text-blue-600">{formatCurrencyCOP(order.total)}</p>
+                                    </div>
+                                    <button 
+                                        onClick={() => handleReorder(order)} 
+                                        className="flex items-center bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded text-sm font-medium transition-colors"
+                                    >
+                                        <History size={14} className="mr-1" /> 
+                                        Reordenar
+                                    </button>
+                                </div>
+                            );
+                        })}
+                    </div>
+                )}
+
                 <h1 className="text-3xl font-bold text-gray-800 mb-6">Realizar Pedido</h1>
 
                 {/* Active Promotions Display */}
@@ -542,31 +592,7 @@ const OrderMenuView: React.FC = () => {
             <div className="lg:w-96 bg-white p-4 lg:p-6 shadow-lg flex flex-col">
                 <h2 className="text-2xl font-bold text-gray-800 mb-4">Mi Carrito</h2>
                 
-                {/* Pedido Anterior - Moved to top and highlighted */}
-                {orderHistory.length > 0 && (
-                    <div className="mb-4 p-4 bg-gradient-to-r from-blue-50 to-blue-100 border-2 border-blue-300 rounded-lg shadow-md">
-                        <div className="flex items-center mb-2">
-                            <History size={20} className="text-blue-700 mr-2" />
-                            <p className="font-bold text-blue-800 text-lg">Pedido anterior:</p>
-                        </div>
-                        {orderHistory.map(order => (
-                            <div key={order.id} className="flex justify-between items-center bg-white p-3 rounded-md shadow-sm">
-                                <div>
-                                    <span className="text-sm font-semibold text-gray-700">#{order.id.slice(-6)}</span>
-                                    <p className="text-lg font-bold text-blue-600">{formatCurrencyCOP(order.total)}</p>
-                                </div>
-                                <button 
-                                    onClick={() => handleReorder(order)} 
-                                    className="flex items-center bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-colors shadow-sm"
-                                >
-                                    <History size={16} className="mr-2" /> 
-                                    Reordenar
-                                </button>
-                            </div>
-                        ))}
-                    </div>
-                )}
-                
+
                 {cart.length === 0 ? (
                     <div className="flex-1 flex flex-col items-center justify-center text-gray-500">
                         <ShoppingCart size={48} className="mb-3" />
@@ -800,5 +826,33 @@ const OrderMenuView: React.FC = () => {
     );
 };
 
-export default OrderMenuView;
+// Main wrapper component that handles order tracking
+const CommandeClient: React.FC = () => {
+    const [activeOrderId, setActiveOrderId] = useState<string | null>(() => getActiveCustomerOrder());
+
+    const handleOrderSubmitted = (order: Order) => {
+        setActiveOrderId(order.id);
+    };
+
+    const handleNewOrder = () => {
+        clearActiveCustomerOrder();
+        setActiveOrderId(null);
+    };
+
+    return (
+        <>
+            {activeOrderId ? (
+                <CustomerOrderTracker 
+                    orderId={activeOrderId} 
+                    onNewOrderClick={handleNewOrder} 
+                    variant="page" 
+                />
+            ) : (
+                <OrderMenuView onOrderSubmitted={handleOrderSubmitted} />
+            )}
+        </>
+    );
+};
+
+export default CommandeClient;
 

@@ -17,16 +17,7 @@ const OrderConfirmationModal: React.FC<OrderConfirmationModalProps> = ({
 }) => {
   const navigate = useNavigate();
 
-  useEffect(() => {
-    if (isOpen && order) {
-      // Automatically redirect to order tracking after 3 seconds
-      const timer = setTimeout(() => {
-        navigate(`/suivi-commande/${order.id}`);
-      }, 3000);
-
-      return () => clearTimeout(timer);
-    }
-  }, [isOpen, order, navigate]);
+  // Removed automatic redirect - user will click WhatsApp button to proceed
 
   if (!isOpen || !order) return null;
 
@@ -68,11 +59,8 @@ const OrderConfirmationModal: React.FC<OrderConfirmationModalProps> = ({
         </div>
 
         <div className="p-6 text-center">
-          <p className="text-gray-700 mb-2">
+          <p className="text-gray-700 mb-6">
             Total: <span className="font-bold text-2xl text-green-600">{formatCurrencyCOP(order.total)}</span>
-          </p>
-          <p className="text-sm text-gray-600 mb-6">
-            Serás redirigido al seguimiento de tu pedido en 3 segundos...
           </p>
 
           <button
@@ -86,7 +74,7 @@ const OrderConfirmationModal: React.FC<OrderConfirmationModalProps> = ({
           </button>
 
           <p className="text-xs text-gray-500 mt-4">
-            O espera para ver el seguimiento de tu pedido
+            Haz clic para enviar tu pedido por WhatsApp y ver el seguimiento
           </p>
         </div>
       </div>

@@ -61,12 +61,16 @@ const PrivateRoute: React.FC<{ children: React.ReactElement; permissionKey?: str
 const RootRoute: React.FC = () => {
   const { role, loading, logout } = useAuth();
   const navigate = useNavigate();
-  const [activeOrderId, setActiveOrderId] = useState<string | null>(() => getActiveCustomerOrder());
+  const [activeOrderId, setActiveOrderId] = useState<string | null>(() => {
+    const order = getActiveCustomerOrder();
+    return order ? order.orderId : null;
+  });
   const { content: siteContent } = useSiteContent();
 
   useEffect(() => {
     const checkActiveOrder = () => {
-      setActiveOrderId(getActiveCustomerOrder());
+      const order = getActiveCustomerOrder();
+      setActiveOrderId(order ? order.orderId : null);
     };
     window.addEventListener("storage", checkActiveOrder); // Listen for changes in localStorage
     return () => window.removeEventListener("storage", checkActiveOrder);

@@ -12,7 +12,7 @@ import { api } from '../services/api';
 import { formatCurrencyCOP } from '../utils/formatIntegerAmount';
 import { uploadPaymentReceipt } from '../services/cloudinary';
 import { ShoppingCart, Plus, Minus, History, ArrowLeft } from 'lucide-react';
-import { getActiveCustomerOrder, storeActiveCustomerOrder, clearActiveCustomerOrder } from '../utils/storage';
+import { getActiveCustomerOrder, storeActiveCustomerOrder, clearActiveCustomerOrder } from '../services/customerOrderStorage';
 import ProductCardWithPromotion from '../components/ProductCardWithPromotion';
 import ActivePromotionsDisplay from '../components/ActivePromotionsDisplay';
 import { fetchActivePromotions } from '../services/promotionsApi';
@@ -855,7 +855,10 @@ const OrderMenuView: React.FC<OrderMenuViewProps> = ({ onOrderSubmitted }) => {
 // Main wrapper component that handles order tracking
 const CommandeClient: React.FC = () => {
     const navigate = useNavigate();
-    const [activeOrderId, setActiveOrderId] = useState<string | null>(() => getActiveCustomerOrder());
+    const [activeOrderId, setActiveOrderId] = useState<string | null>(() => {
+        const order = getActiveCustomerOrder();
+        return order ? order.orderId : null;
+    });
     const { content: siteContent } = useSiteContent();
 
     const handleOrderSubmitted = (order: Order) => {

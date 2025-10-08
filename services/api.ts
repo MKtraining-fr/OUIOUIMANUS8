@@ -464,6 +464,10 @@ const mapOrderRow = (row: SupabaseOrderRow): Order => {
     payment_method: row.payment_method ?? undefined,
     payment_receipt_url: row.payment_receipt_url ?? undefined,
     receipt_url: row.receipt_url ?? undefined,
+    subtotal: toNumber(row.subtotal),
+    total_discount: toNumber(row.total_discount),
+    promo_code: row.promo_code ?? undefined,
+    applied_promotions: row.applied_promotions ?? undefined,
   };
 
   if (row.client_nom || row.client_telephone || row.client_adresse) {
@@ -573,13 +577,7 @@ const mapTableRowWithMeta = async (row: SupabaseTableRow): Promise<Table> => {
     : new Map();
 
   return mapTableRow(row, orderMeta);
-};
-
-const selectOrdersQuery = () =>
-  supabase
-    .from('orders')
-    .select(
-      `
+const selectOrdersQuery = () => supabase.from("orders").select("*, order_items(*), subtotal, total_discount, promo_code, applied_promotions");  `
         id,
         type,
         table_id,

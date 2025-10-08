@@ -12,7 +12,7 @@ import { fetchActivePromotions } from '../services/promotionsApi';
 import useSiteContent from '../hooks/useSiteContent';
 import { createHeroBackgroundStyle } from '../utils/siteStyleHelpers';
 
-const DOMICILIO_FEE = 5000;
+const DOMICILIO_FEE = 8000;
 const DOMICILIO_ITEM_NAME = 'Domicilio';
 
 const isDeliveryFeeItem = (item: OrderItem) => item.nom_produit === DOMICILIO_ITEM_NAME;

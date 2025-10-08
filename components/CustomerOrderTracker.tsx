@@ -195,12 +195,24 @@ const CustomerOrderTracker: React.FC<CustomerOrderTrackerProps> = ({ orderId, on
                 <div className={`${variant === 'hero' ? 'bg-black/20 p-4 rounded-lg' : 'border-t pt-6 mt-6'} space-y-4`}>
                     <h3 className={`text-xl font-bold ${variant === 'hero' ? 'text-white' : 'text-gray-800'}`}>Résumé de la commande</h3>
                     <div className="space-y-2">
-                        {order.items.map(item => (
-                            <div key={item.id} className={`flex justify-between ${variant === 'hero' ? 'text-gray-200' : 'text-gray-600'}`}>
-                                <span>{item.quantite}x {item.nom_produit}</span>
-                                <span>{formatCurrencyCOP(item.prix_unitaire * item.quantite)}</span>
-                            </div>
-                        ))}
+                        {order.items.map(item => {
+                            const isDomicilio = item.nom_produit === 'Domicilio';
+                            const isFreeShipping = isDomicilio && item.prix_unitaire === 0;
+                            
+                            return (
+                                <div key={item.id} className={`flex justify-between items-center ${variant === 'hero' ? 'text-gray-200' : 'text-gray-600'}`}>
+                                    <span>{item.quantite}x {item.nom_produit}</span>
+                                    {isFreeShipping ? (
+                                        <div className="flex items-center space-x-2">
+                                            <span className={`text-sm ${variant === 'hero' ? 'text-gray-400' : 'text-gray-400'} line-through`}>{formatCurrencyCOP(8000)}</span>
+                                            <span className="text-sm font-bold text-green-600">GRATIS</span>
+                                        </div>
+                                    ) : (
+                                        <span>{formatCurrencyCOP(item.prix_unitaire * item.quantite)}</span>
+                                    )}
+                                </div>
+                            );
+                        })}
                     </div>
                     <div className={`flex justify-between font-bold text-lg border-t pt-2 ${variant === 'hero' ? 'text-white border-gray-500' : 'text-gray-800'}`}>
                         <span>Total</span>
@@ -230,7 +242,7 @@ const CustomerOrderTracker: React.FC<CustomerOrderTrackerProps> = ({ orderId, on
                             <button onClick={onNewOrderClick} className={`${variant === 'hero' ? 'bg-gray-200 text-gray-800' : 'bg-brand-primary text-brand-secondary'} font-bold py-3 px-6 rounded-lg hover:bg-gray-300 transition`}>
                                 Nouvelle commande
                             </button>
-                            <button onClick={() => { onNewOrderClick(); window.location.href = '/'; }} className="text-sm text-gray-500 hover:underline">
+                            <button onClick={() => window.location.href = '/'} className="text-sm text-gray-500 hover:underline">
                                 Volver
                             </button>
                         </div>
@@ -239,7 +251,7 @@ const CustomerOrderTracker: React.FC<CustomerOrderTrackerProps> = ({ orderId, on
                             <p className={`text-sm ${variant === 'hero' ? 'text-gray-300' : 'text-gray-600'}`}>
                                 Le statut de votre commande est mis à jour automatiquement.
                             </p>
-                            <button onClick={() => { onNewOrderClick(); window.location.href = '/'; }} className="text-sm text-gray-500 hover:underline">
+                            <button onClick={() => window.location.href = '/'} className="text-sm text-gray-500 hover:underline">
                                 Volver
                             </button>
                         </div>

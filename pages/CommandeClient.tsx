@@ -576,30 +576,41 @@ const OrderMenuView: React.FC<OrderMenuViewProps> = ({ onOrderSubmitted }) => {
                     </div>
                 ) : (
                     <div className="flex-1 overflow-y-auto pr-2 -mr-2">
-                        {cart.map(item => (
-                            <div key={item.id} className="flex items-center justify-between py-3 border-b border-gray-200 last:border-b-0">
-                                <div>
-                                    <p className="font-medium text-gray-800">{item.nom_produit}</p>
-                                    {item.commentaire && <p className="text-sm text-gray-500 italic">{item.commentaire}</p>}
-                                    {item.excluded_ingredients && item.excluded_ingredients.length > 0 && (
-                                        <p className="text-xs text-gray-500">Sin: {item.excluded_ingredients.join(", ")}</p>
+                        {cart.map((item) => (
+                            <div key={item.id} className="flex items-start justify-between py-4 border-b border-gray-200 last:border-b-0 bg-white rounded-lg px-3 mb-2 shadow-sm">
+                                <div className="flex-1">
+                                    <p className="font-bold text-lg text-gray-900 mb-1">{item.nom_produit}</p>
+                                    {item.commentaire && (
+                                        <p className="text-sm text-gray-600 italic mb-1 bg-yellow-50 p-2 rounded border-l-2 border-yellow-400">
+                                            💬 {item.commentaire}
+                                        </p>
                                     )}
-                                    <p className="text-sm text-gray-600">{formatCurrencyCOP(item.prix_unitaire)}</p>
+                                    {item.excluded_ingredients && item.excluded_ingredients.length > 0 && (
+                                        <p className="text-sm text-red-600 mb-1 bg-red-50 p-2 rounded border-l-2 border-red-400">
+                                            🚫 Sin: {item.excluded_ingredients.join(", ")}
+                                        </p>
+                                    )}
+                                    <p className="text-base font-semibold text-brand-primary mt-2">{formatCurrencyCOP(item.prix_unitaire)}</p>
                                 </div>
-                                <div className="flex items-center">
-                                    <button
-                                        onClick={() => handleQuantityChange(item.id, -1)}
-                                        className="text-brand-primary hover:text-brand-primary-dark p-1"
-                                    >
-                                        <Minus size={16} />
-                                    </button>
-                                    <span className="mx-2 text-gray-700 font-medium">{item.quantite}</span>
-                                    <button
-                                        onClick={() => handleQuantityChange(item.id, 1)}
-                                        className="text-brand-primary hover:text-brand-primary-dark p-1"
-                                    >
-                                        <Plus size={16} />
-                                    </button>
+                                <div className="flex flex-col items-center ml-4">
+                                    <div className="flex items-center bg-gray-100 rounded-full p-1">
+                                        <button
+                                            onClick={() => handleQuantityChange(item.id, -1)}
+                                            className="text-brand-primary hover:text-brand-primary-dark p-2 hover:bg-gray-200 rounded-full transition"
+                                        >
+                                            <Minus size={18} />
+                                        </button>
+                                        <span className="mx-3 text-gray-900 font-bold text-lg min-w-[24px] text-center">{item.quantite}</span>
+                                        <button
+                                            onClick={() => handleQuantityChange(item.id, 1)}
+                                            className="text-brand-primary hover:text-brand-primary-dark p-2 hover:bg-gray-200 rounded-full transition"
+                                        >
+                                            <Plus size={18} />
+                                        </button>
+                                    </div>
+                                    <p className="text-sm font-semibold text-gray-700 mt-2">
+                                        {formatCurrencyCOP(item.prix_unitaire * item.quantite)}
+                                    </p>
                                 </div>
                             </div>
                         ))}

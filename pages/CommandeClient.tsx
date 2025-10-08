@@ -248,6 +248,8 @@ const OrderMenuView: React.FC = () => {
     const [appliedPromoCode, setAppliedPromoCode] = useState<string>('');
     const [promoCodeError, setPromoCodeError] = useState<string>('');
     const [promoCodeDiscount, setPromoCodeDiscount] = useState<number>(0);
+    const [isFreeShipping, setIsFreeShipping] = useState<boolean>(false);
+    const [freeShippingMinAmount, setFreeShippingMinAmount] = useState<number>(80000);
     
     useEffect(() => {
         const fetchData = async () => {
@@ -290,11 +292,18 @@ const OrderMenuView: React.FC = () => {
     const total = useMemo(() => {
         const subtotal = cart.reduce((acc, item) => acc + item.quantite * item.prix_unitaire, 0);
         if (cart.length === 0) {
+            setIsFreeShipping(false);
             return subtotal;
         }
-        const totalWithDelivery = subtotal + DOMICILIO_FEE;
+        
+        // Check if free shipping applies
+        const qualifiesForFreeShipping = subtotal >= freeShippingMinAmount;
+        setIsFreeShipping(qualifiesForFreeShipping);
+        
+        const deliveryFee = qualifiesForFreeShipping ? 0 : DOMICILIO_FEE;
+        const totalWithDelivery = subtotal + deliveryFee;
         return Math.max(0, totalWithDelivery - promoCodeDiscount);
-    }, [cart, promoCodeDiscount]);
+    }, [cart, promoCodeDiscount, freeShippingMinAmount]);
 
     const handleProductClick = (product: Product) => {
         setSelectedProduct({product});
@@ -566,10 +575,17 @@ const OrderMenuView: React.FC = () => {
                                 </div>
                             </div>
                         ))}
-                        {cart.some(isDeliveryFeeItem) && (
+                        {cart.length > 0 && (
                             <div className="flex items-center justify-between py-3 border-b border-gray-200 last:border-b-0">
                                 <p className="font-medium text-gray-800">{DOMICILIO_ITEM_NAME}</p>
-                                <p className="text-sm text-gray-600">{formatCurrencyCOP(DOMICILIO_FEE)}</p>
+                                {isFreeShipping ? (
+                                    <div className="flex items-center space-x-2">
+                                        <p className="text-sm text-gray-400 line-through">{formatCurrencyCOP(DOMICILIO_FEE)}</p>
+                                        <p className="text-sm font-bold text-green-600">GRATIS</p>
+                                    </div>
+                                ) : (
+                                    <p className="text-sm text-gray-600">{formatCurrencyCOP(DOMICILIO_FEE)}</p>
+                                )}
                             </div>
                         )}
                     </div>
@@ -639,7 +655,9 @@ const OrderMenuView: React.FC = () => {
 
                     <form onSubmit={handleSubmitOrder} className="space-y-4">
                         <div>
-                            <label htmlFor="clientName" className="block text-sm font-medium text-gray-700">Nombre:</label>
+                            <label htmlFor="clientName" className="block text-sm font-medium text-gray-700">
+                                Nombre: <span className="text-red-500">*</span>
+                            </label>
                             <input
                                 type="text"
                                 id="clientName"
@@ -647,10 +665,13 @@ const OrderMenuView: React.FC = () => {
                                 onChange={(e) => setClientInfo({...clientInfo, nom: e.target.value})}
                                 className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
                                 required
+                                placeholder="Ingresa tu nombre completo"
                             />
                         </div>
                         <div>
-                            <label htmlFor="clientPhone" className="block text-sm font-medium text-gray-700">Teléfono:</label>
+                            <label htmlFor="clientPhone" className="block text-sm font-medium text-gray-700">
+                                Teléfono: <span className="text-red-500">*</span>
+                            </label>
                             <input
                                 type="tel"
                                 id="clientPhone"
@@ -658,10 +679,13 @@ const OrderMenuView: React.FC = () => {
                                 onChange={(e) => setClientInfo({...clientInfo, telephone: e.target.value})}
                                 className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
                                 required
+                                placeholder="Ej: 3001234567"
                             />
                         </div>
                         <div>
-                            <label htmlFor="clientAddress" className="block text-sm font-medium text-gray-700">Dirección:</label>
+                            <label htmlFor="clientAddress" className="block text-sm font-medium text-gray-700">
+                                Dirección: <span className="text-red-500">*</span>
+                            </label>
                             <input
                                 type="text"
                                 id="clientAddress"
@@ -669,6 +693,7 @@ const OrderMenuView: React.FC = () => {
                                 onChange={(e) => setClientInfo({...clientInfo, adresse: e.target.value})}
                                 className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
                                 required
+                                placeholder="Calle, número, barrio, ciudad"
                             />
                         </div>
                         <div>

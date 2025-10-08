@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="title desc">
+  <title>Staff Login Logo</title>
+  <desc>Key icon enclosed in a rounded square.</desc>
+  <rect x="4" y="4" width="56" height="56" rx="14" fill="#1F2937" />
+  <circle cx="26" cy="30" r="10" fill="#FACC15" />
+  <path d="M35 30h13l-3 4h-4v4h-5z" fill="#FACC15" />
+  <circle cx="24" cy="28" r="3" fill="#1F2937" />
+</svg>

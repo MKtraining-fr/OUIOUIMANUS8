@@ -1,4 +1,4 @@
-// Types pour le système de promotions
+// Types pour le système de promotions - Adaptés à la structure Supabase existante
 
 // Types de promotions disponibles
 export type PromotionType = 
@@ -12,77 +12,78 @@ export type PromotionType =
   | 'threshold' // Réduction par palier (ex: -5% à partir de 30k, -10% à partir de 50k)
   | 'happy_hour'; // Promotion temporelle (ex: happy hour)
 
-// Statut d'une promotion
-export type PromotionStatus = 
-  | 'active' // Promotion active
-  | 'inactive' // Promotion inactive
-  | 'scheduled' // Promotion programmée pour une date future
-  | 'expired'; // Promotion expirée
+// Condition d'application d'une promotion (élément du tableau conditions)
+export interface PromotionCondition {
+  type: 'specific_product' | 'specific_category' | 'min_order_amount' | 'min_items_count' | 'promo_code' | 'buy_x_get_y' | 'threshold' | 'first_order_only';
+  value?: any; // Valeur de la condition (peut être un nombre, une chaîne, un tableau, etc.)
+  buy_quantity?: number; // Pour buy_x_get_y
+  get_quantity?: number; // Pour buy_x_get_y
+  threshold_values?: { // Pour threshold
+    amount: number;
+    discount: number;
+  }[];
+}
 
-// Conditions d'application d'une promotion
-export interface PromotionConditions {
-  // Conditions temporelles
-  start_date?: string; // Date de début (ISO string)
-  end_date?: string; // Date de fin (ISO string)
-  days_of_week?: number[]; // Jours de la semaine (0-6, 0 = dimanche)
-  hours_of_day?: {
-    start: string; // Heure de début (format "HH:MM")
-    end: string; // Heure de fin (format "HH:MM")
+// Configuration de la promotion (stockée dans le champ config)
+export interface PromotionConfig {
+  // Type de réduction
+  discount_type: 'percentage' | 'fixed_amount';
+  discount_value: number;
+  max_discount_amount?: number; // Plafond de réduction pour les pourcentages
+  applies_to: 'total' | 'products' | 'shipping' | 'category';
+  
+  // Éléments visuels
+  visuals?: {
+    badge_text?: string; // Texte du badge (ex: "2x1", "-20%")
+    badge_color?: string; // Couleur du texte du badge (hex)
+    badge_bg_color?: string; // Couleur de fond du badge (hex)
+    badge_position?: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
+    banner_image?: string; // URL de l'image de la bannière
+    banner_text?: string; // Texte de la bannière
+    banner_cta?: string; // Texte du bouton d'appel à l'action
+    description?: string; // Description de la promotion
+    icon?: string; // Icône à afficher
   };
   
-  // Conditions liées aux produits
-  product_ids?: string[]; // Liste des IDs de produits concernés
-  category_ids?: string[]; // Liste des IDs de catégories concernées
+  // Conditions temporelles (heures de la journée, jours de la semaine)
+  days_of_week?: number[]; // 0-6, 0 = dimanche
+  hours_of_day?: {
+    start: string; // Format "HH:MM"
+    end: string; // Format "HH:MM"
+  };
   
-  // Conditions liées à la commande
-  min_order_amount?: number; // Montant minimum de commande
-  min_items_count?: number; // Nombre minimum d'articles
+  // IDs de produits ou catégories concernés
+  product_ids?: string[];
+  category_ids?: string[];
   
   // Conditions spécifiques
-  promo_code?: string; // Code promo à saisir
-  buy_quantity?: number; // Quantité à acheter pour "buy_x_get_y"
-  get_quantity?: number; // Quantité offerte pour "buy_x_get_y"
-  threshold_values?: { // Valeurs de seuil pour les réductions par palier
-    amount: number; // Montant du seuil
-    discount: number; // Valeur de la réduction (pourcentage ou montant fixe)
-  }[];
+  promo_code?: string;
+  buy_quantity?: number;
+  get_quantity?: number;
+  min_order_amount?: number;
+  min_items_count?: number;
   
-  // Conditions d'utilisation
-  max_uses_total?: number; // Nombre maximum d'utilisations au total
-  max_uses_per_customer?: number; // Nombre maximum d'utilisations par client
-  first_order_only?: boolean; // Uniquement pour la première commande
+  // Limites d'utilisation par client
+  max_uses_per_customer?: number;
+  first_order_only?: boolean;
 }
 
-// Valeur de la réduction
-export interface PromotionDiscount {
-  type: 'percentage' | 'fixed_amount'; // Type de réduction
-  value: number; // Valeur de la réduction (pourcentage ou montant fixe)
-  max_discount_amount?: number; // Montant maximum de la réduction (pour les pourcentages)
-  applies_to: 'total' | 'products' | 'shipping'; // Application de la réduction
-}
-
-// Éléments visuels de la promotion
-export interface PromotionVisuals {
-  badge_text?: string; // Texte du badge (ex: "2x1", "-20%")
-  badge_color?: string; // Couleur du badge (hex)
-  banner_image?: string; // URL de l'image de la bannière
-  banner_text?: string; // Texte de la bannière
-  banner_cta?: string; // Texte du bouton d'appel à l'action
-}
-
-// Promotion complète
+// Promotion complète (correspondant à la structure Supabase)
 export interface Promotion {
   id: string;
   name: string;
-  type: PromotionType;
-  status: PromotionStatus;
-  priority: number; // Priorité d'application (plus le nombre est élevé, plus la priorité est haute)
-  conditions: PromotionConditions;
-  discount: PromotionDiscount;
-  visuals?: PromotionVisuals;
+  description?: string;
+  active: boolean; // Remplace status
+  start_date: string; // Date de début (ISO string)
+  end_date?: string; // Date de fin optionnelle (ISO string)
+  conditions: PromotionCondition[]; // Tableau de conditions
+  config: PromotionConfig; // Configuration complète
+  priority: number; // Priorité d'application (plus élevé = plus prioritaire)
+  stackable: boolean; // Peut être combinée avec d'autres promotions
+  usage_limit?: number; // Limite d'utilisation totale
+  usage_count: number; // Nombre d'utilisations actuelles
   created_at: string;
   updated_at: string;
-  usage_count: number; // Nombre d'utilisations
 }
 
 // Utilisation d'une promotion
@@ -106,3 +107,55 @@ export interface OrderWithPromotions {
     discount_amount: number;
   }[];
 }
+
+// Helper pour vérifier si une promotion est actuellement valide
+export const isPromotionCurrentlyValid = (promotion: Promotion): boolean => {
+  if (!promotion.active) return false;
+  
+  const now = new Date();
+  const startDate = new Date(promotion.start_date);
+  const endDate = promotion.end_date ? new Date(promotion.end_date) : null;
+  
+  if (now < startDate) return false;
+  if (endDate && now > endDate) return false;
+  
+  // Vérifier la limite d'utilisation
+  if (promotion.usage_limit && promotion.usage_count >= promotion.usage_limit) {
+    return false;
+  }
+  
+  return true;
+};
+
+// Helper pour vérifier les conditions temporelles (heures et jours)
+export const isPromotionValidAtTime = (promotion: Promotion): boolean => {
+  const now = new Date();
+  const config = promotion.config;
+  
+  // Vérifier le jour de la semaine
+  if (config.days_of_week && config.days_of_week.length > 0) {
+    const currentDay = now.getDay();
+    if (!config.days_of_week.includes(currentDay)) {
+      return false;
+    }
+  }
+  
+  // Vérifier l'heure de la journée
+  if (config.hours_of_day) {
+    const currentHour = now.getHours();
+    const currentMinute = now.getMinutes();
+    const currentTimeMinutes = currentHour * 60 + currentMinute;
+    
+    const [startHour, startMinute] = config.hours_of_day.start.split(':').map(Number);
+    const [endHour, endMinute] = config.hours_of_day.end.split(':').map(Number);
+    
+    const startTimeMinutes = startHour * 60 + startMinute;
+    const endTimeMinutes = endHour * 60 + endMinute;
+    
+    if (currentTimeMinutes < startTimeMinutes || currentTimeMinutes > endTimeMinutes) {
+      return false;
+    }
+  }
+  
+  return true;
+};

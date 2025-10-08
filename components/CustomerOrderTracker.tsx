@@ -214,6 +214,37 @@ const CustomerOrderTracker: React.FC<CustomerOrderTrackerProps> = ({ orderId, on
                             );
                         })}
                     </div>
+                    
+                    {/* Affichage des promotions et réductions */}
+                    {(order.subtotal || order.total_discount || order.promo_code || order.applied_promotions) && (
+                        <div className={`border-t pt-3 mt-3 space-y-2 ${variant === 'hero' ? 'border-gray-500' : 'border-gray-300'}`}>
+                            {order.subtotal && order.subtotal !== order.total && (
+                                <div className={`flex justify-between ${variant === 'hero' ? 'text-gray-300' : 'text-gray-600'}`}>
+                                    <span>Subtotal</span>
+                                    <span>{formatCurrencyCOP(order.subtotal)}</span>
+                                </div>
+                            )}
+                            
+                            {order.applied_promotions && order.applied_promotions.length > 0 && (
+                                <div className="space-y-1">
+                                    {order.applied_promotions.map((promo, index) => (
+                                        <div key={index} className={`flex justify-between items-center ${variant === 'hero' ? 'text-green-400' : 'text-green-600'}`}>
+                                            <span className="text-sm">🎉 {promo.name}</span>
+                                            <span className="text-sm font-semibold">-{formatCurrencyCOP(promo.discount_amount)}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                            
+                            {order.promo_code && (
+                                <div className={`flex justify-between items-center ${variant === 'hero' ? 'text-green-400' : 'text-green-600'}`}>
+                                    <span className="text-sm">🎟️ Code promo: {order.promo_code}</span>
+                                    <span className="text-sm font-semibold">-{formatCurrencyCOP(order.total_discount || 0)}</span>
+                                </div>
+                            )}
+                        </div>
+                    )}
+                    
                     <div className={`flex justify-between font-bold text-lg border-t pt-2 ${variant === 'hero' ? 'text-white border-gray-500' : 'text-gray-800'}`}>
                         <span>Total</span>
                         <span>{formatCurrencyCOP(order.total)}</span>
@@ -239,11 +270,11 @@ const CustomerOrderTracker: React.FC<CustomerOrderTrackerProps> = ({ orderId, on
                     )}
                     {order.statut === 'finalisee' ? (
                         <div className="flex flex-col space-y-4">
-                            <button onClick={onNewOrderClick} className={`${variant === 'hero' ? 'bg-gray-200 text-gray-800' : 'bg-brand-primary text-brand-secondary'} font-bold py-3 px-6 rounded-lg hover:bg-gray-300 transition`}>
-                                Nouvelle commande
-                            </button>
-                            <button onClick={() => window.location.href = '/'} className="text-sm text-gray-500 hover:underline">
-                                Volver
+                            <button 
+                                onClick={onNewOrderClick} 
+                                className={`${variant === 'hero' ? 'bg-gray-200 text-gray-800' : 'bg-brand-primary text-brand-secondary'} font-bold py-3 px-6 rounded-lg hover:bg-gray-300 transition`}
+                            >
+                                Terminar y volver
                             </button>
                         </div>
                     ) : (

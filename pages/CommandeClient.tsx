@@ -266,6 +266,7 @@ const OrderMenuView: React.FC<OrderMenuViewProps> = ({ onOrderSubmitted }) => {
     const [promoCodeDiscount, setPromoCodeDiscount] = useState<number>(0);
     const [isFreeShipping, setIsFreeShipping] = useState<boolean>(false);
     const [freeShippingMinAmount, setFreeShippingMinAmount] = useState<number>(80000);
+    const [orderType, setOrderType] = useState<'pedir_en_linea' | 'a_emporter'>('pedir_en_linea');
     
     useEffect(() => {
         const fetchData = async () => {
@@ -411,7 +412,9 @@ const OrderMenuView: React.FC<OrderMenuViewProps> = ({ onOrderSubmitted }) => {
 
     const handleSubmitOrder = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!clientInfo.nom || !clientInfo.telephone || !clientInfo.adresse || !paymentProof || !paymentMethod) return;
+        // Pour les commandes à emporter, l'adresse n'est pas obligatoire
+        const isAddressRequired = orderType === 'pedir_en_linea';
+        if (!clientInfo.nom || !clientInfo.telephone || (isAddressRequired && !clientInfo.adresse) || !paymentProof || !paymentMethod) return;
         setSubmitting(true);
         try {
             let receiptUrl: string | undefined;
@@ -421,9 +424,13 @@ const OrderMenuView: React.FC<OrderMenuViewProps> = ({ onOrderSubmitted }) => {
                 });
             }
 
-            const itemsToSubmit = cart.length > 0 ? [...cart, createDeliveryFeeItem()] : cart;
+            // Pour les commandes à emporter, on n'ajoute pas les frais de domicilio
+            const itemsToSubmit = orderType === 'pedir_en_linea' && cart.length > 0 
+                ? [...cart, createDeliveryFeeItem()] 
+                : cart;
 
             const orderData = {
+                type: orderType,
                 items: itemsToSubmit,
                 clientInfo,
                 receipt_url: receiptUrl,
@@ -681,6 +688,35 @@ const OrderMenuView: React.FC<OrderMenuViewProps> = ({ onOrderSubmitted }) => {
 
 
                     <form onSubmit={handleSubmitOrder} className="space-y-4">
+                        {/* Sélecteur de type de commande */}
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">Tipo de pedido:</label>
+                            <div className="space-y-2">
+                                <label className={`flex items-center p-3 border-2 rounded-lg cursor-pointer transition ${orderType === 'pedir_en_linea' ? 'border-brand-primary bg-brand-primary/5' : 'border-gray-300 hover:border-brand-primary/50'}`}>
+                                    <input
+                                        type="radio"
+                                        name="orderType"
+                                        value="pedir_en_linea"
+                                        checked={orderType === 'pedir_en_linea'}
+                                        onChange={() => setOrderType('pedir_en_linea')}
+                                        className="form-radio text-brand-primary"
+                                    />
+                                    <span className="ml-3 font-medium">🚚 Domicilio (con entrega)</span>
+                                </label>
+                                <label className={`flex items-center p-3 border-2 rounded-lg cursor-pointer transition ${orderType === 'a_emporter' ? 'border-brand-primary bg-brand-primary/5' : 'border-gray-300 hover:border-brand-primary/50'}`}>
+                                    <input
+                                        type="radio"
+                                        name="orderType"
+                                        value="a_emporter"
+                                        checked={orderType === 'a_emporter'}
+                                        onChange={() => setOrderType('a_emporter')}
+                                        className="form-radio text-brand-primary"
+                                    />
+                                    <span className="ml-3 font-medium">🏪 Para llevar (recoger en tienda)</span>
+                                </label>
+                            </div>
+                        </div>
+
                         <div>
                             <label htmlFor="clientName" className="block text-sm font-medium text-gray-700">
                                 Nombre: <span className="text-red-500">*</span>
@@ -709,20 +745,22 @@ const OrderMenuView: React.FC<OrderMenuViewProps> = ({ onOrderSubmitted }) => {
                                 placeholder="Ej: 3001234567"
                             />
                         </div>
-                        <div>
-                            <label htmlFor="clientAddress" className="block text-sm font-medium text-gray-700">
-                                Dirección: <span className="text-red-500">*</span>
-                            </label>
-                            <input
-                                type="text"
-                                id="clientAddress"
-                                value={clientInfo.adresse}
-                                onChange={(e) => setClientInfo({...clientInfo, adresse: e.target.value})}
-                                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
-                                required
-                                placeholder="Calle, número, barrio, ciudad"
-                            />
-                        </div>
+                        {orderType === 'pedir_en_linea' && (
+                            <div>
+                                <label htmlFor="clientAddress" className="block text-sm font-medium text-gray-700">
+                                    Dirección: <span className="text-red-500">*</span>
+                                </label>
+                                <input
+                                    type="text"
+                                    id="clientAddress"
+                                    value={clientInfo.adresse}
+                                    onChange={(e) => setClientInfo({...clientInfo, adresse: e.target.value})}
+                                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
+                                    required
+                                    placeholder="Calle, número, barrio, ciudad"
+                                />
+                            </div>
+                        )}
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">Método de Pago:</label>
                             <div className="space-y-2">

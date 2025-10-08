@@ -643,7 +643,7 @@ const buildProductSelectColumns = (includeBestSellerColumns: boolean, includeRec
         prix_vente,
         categoria_id,
         estado,
-        image${bestSellerColumns}${recipeColumns}
+        image${bestSellerColumns ? `, ${bestSellerColumns}` : ''}${recipeColumns ? `, ${recipeColumns}` : ''}
       `;
 };
 

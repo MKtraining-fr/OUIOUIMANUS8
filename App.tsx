@@ -1,9 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
-import CustomerOrderTracker from './components/CustomerOrderTracker';
-import { getActiveCustomerOrder, clearActiveCustomerOrder, storeActiveCustomerOrder } from './services/customerOrderStorage';
-import useSiteContent from './hooks/useSiteContent';
-import { createHeroBackgroundStyle } from './utils/siteStyleHelpers';
+import { getActiveCustomerOrder, clearActiveCustomerOrder } from './services/customerOrderStorage';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import ProtectedLayout from './pages/ProtectedLayout';
 import Login from './pages/Login';
@@ -86,20 +83,7 @@ const RootRoute: React.FC = () => {
     return <LoadingScreen />;
   }
 
-  // If there's an active order, display the tracker on the home page (replacing the Hero)
-  if (activeOrderId) {
-    return (
-      <div className="min-h-screen bg-gray-50">
-        <CustomerOrderTracker 
-          orderId={activeOrderId} 
-          onNewOrderClick={handleNewOrder} 
-          variant="page" 
-        />
-      </div>
-    );
-  }
-
-  // If no active order, proceed with original logic (login or redirect based on role)
+  // If no role, show the public home page (Login component handles displaying tracker in Hero if active order)
   if (!role) {
     return <Login />;
   }

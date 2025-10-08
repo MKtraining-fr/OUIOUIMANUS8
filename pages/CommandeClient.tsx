@@ -11,6 +11,7 @@ import ActivePromotionsDisplay from '../components/ActivePromotionsDisplay';
 import { fetchActivePromotions } from '../services/promotionsApi';
 import useSiteContent from '../hooks/useSiteContent';
 import { createHeroBackgroundStyle } from '../utils/siteStyleHelpers';
+import OrderConfirmationModal from '../components/OrderConfirmationModal';
 
 const DOMICILIO_FEE = 8000;
 const DOMICILIO_ITEM_NAME = 'Domicilio';
@@ -541,6 +542,31 @@ const OrderMenuView: React.FC = () => {
             <div className="lg:w-96 bg-white p-4 lg:p-6 shadow-lg flex flex-col">
                 <h2 className="text-2xl font-bold text-gray-800 mb-4">Mi Carrito</h2>
                 
+                {/* Pedido Anterior - Moved to top and highlighted */}
+                {orderHistory.length > 0 && (
+                    <div className="mb-4 p-4 bg-gradient-to-r from-blue-50 to-blue-100 border-2 border-blue-300 rounded-lg shadow-md">
+                        <div className="flex items-center mb-2">
+                            <History size={20} className="text-blue-700 mr-2" />
+                            <p className="font-bold text-blue-800 text-lg">Pedido anterior:</p>
+                        </div>
+                        {orderHistory.map(order => (
+                            <div key={order.id} className="flex justify-between items-center bg-white p-3 rounded-md shadow-sm">
+                                <div>
+                                    <span className="text-sm font-semibold text-gray-700">#{order.id.slice(-6)}</span>
+                                    <p className="text-lg font-bold text-blue-600">{formatCurrencyCOP(order.total)}</p>
+                                </div>
+                                <button 
+                                    onClick={() => handleReorder(order)} 
+                                    className="flex items-center bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-colors shadow-sm"
+                                >
+                                    <History size={16} className="mr-2" /> 
+                                    Reordenar
+                                </button>
+                            </div>
+                        ))}
+                    </div>
+                )}
+                
                 {cart.length === 0 ? (
                     <div className="flex-1 flex flex-col items-center justify-center text-gray-500">
                         <ShoppingCart size={48} className="mb-3" />
@@ -639,19 +665,7 @@ const OrderMenuView: React.FC = () => {
                         <p className="text-xl font-bold text-brand-primary">{formatCurrencyCOP(total)}</p>
                     </div>
 
-                    {orderHistory.length > 0 && (
-                        <div className="mb-4 p-3 bg-blue-50 rounded-lg">
-                            <p className="font-semibold text-blue-700 mb-2">Pedido anterior:</p>
-                            {orderHistory.map(order => (
-                                <div key={order.id} className="flex justify-between items-center text-sm text-blue-600 mb-1">
-                                    <span>#{order.id.slice(-6)} - {formatCurrencyCOP(order.total)}</span>
-                                    <button onClick={() => handleReorder(order)} className="text-blue-500 hover:underline flex items-center">
-                                        <History size={16} className="mr-1" /> Reordenar
-                                    </button>
-                                </div>
-                            ))}
-                        </div>
-                    )}
+
 
                     <form onSubmit={handleSubmitOrder} className="space-y-4">
                         <div>
@@ -777,10 +791,10 @@ const OrderMenuView: React.FC = () => {
                 onAddToCart={handleAddToCart}
             />
 
-            <ConfirmationModal
+            <OrderConfirmationModal
                 isOpen={confirmOpen}
                 order={submittedOrder}
-                onClose={() => setConfirmOpen(false)}
+                whatsappNumber={siteContent?.whatsappNumber || '573238090562'}
             />
         </div>
     );

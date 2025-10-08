@@ -224,6 +224,7 @@ export interface SiteContent {
     text: string;
     style: SectionStyle;
   };
+  whatsappNumber?: string;
   elementStyles: ElementStyles;
   elementRichText: ElementRichText;
   assets: SiteAssets;

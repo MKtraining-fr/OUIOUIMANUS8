@@ -15,7 +15,7 @@ import { ShoppingCart, Plus, Minus, History, ArrowLeft } from 'lucide-react';
 import { getActiveCustomerOrder, storeActiveCustomerOrder, clearActiveCustomerOrder } from '../services/customerOrderStorage';
 import ProductCardWithPromotion from '../components/ProductCardWithPromotion';
 import ActivePromotionsDisplay from '../components/ActivePromotionsDisplay';
-import { fetchActivePromotions } from '../services/promotionsApi';
+import { fetchActivePromotions, applyPromotionsToOrder } from '../services/promotionsApi';
 import useSiteContent from '../hooks/useSiteContent';
 import { createHeroBackgroundStyle } from '../utils/siteStyleHelpers';
 import OrderConfirmationModal from '../components/OrderConfirmationModal';
@@ -360,43 +360,26 @@ const OrderMenuView: React.FC<OrderMenuViewProps> = ({ onOrderSubmitted }) => {
     const handleApplyPromoCode = async () => {
         setPromoCodeError('');
         try {
-            // Fetch all active promotions
-            const promotions = await fetchActivePromotions();
+            const tempOrder = {
+                id: "temp-order",
+                items: cart.filter(item => !isDeliveryFeeItem(item)),
+                clientInfo: clientInfo,
+                total: cart.reduce((acc, item) => acc + item.quantite * item.prix_unitaire, 0),
+                promo_code: promoCode,
+                applied_promotions: [],
+                subtotal: 0,
+                total_discount: 0,
+            };
+
+            const updatedOrder = await applyPromotionsToOrder(tempOrder);
             
-            // Find promo code promotion
-            const promoCodePromotion = promotions.find(promo => {
-                const config = promo.config as any;
-                return config.promo_code && config.promo_code.toUpperCase() === promoCode.toUpperCase();
-            });
-
-            if (!promoCodePromotion) {
-                setPromoCodeError('Código de promoción inválido');
-                return;
+            if (updatedOrder.total_discount > 0) {
+                setAppliedPromoCode(promoCode);
+                setPromoCodeDiscount(updatedOrder.total_discount);
+                setPromoCodeError("");
+            } else {
+                setPromoCodeError("Código de promoción inválido o no aplicable.");
             }
-
-            // Check conditions
-            const config = promoCodePromotion.config as any;
-            const conditions = promoCodePromotion.conditions as any[];
-            
-            const subtotal = cart.reduce((acc, item) => acc + item.quantite * item.prix_unitaire, 0);
-            const minAmount = conditions.find(c => c.type === 'min_order_amount');
-            
-            if (minAmount && subtotal < minAmount.value) {
-                setPromoCodeError(`Monto mínimo requerido: $${minAmount.value.toLocaleString()}`);
-                return;
-            }
-
-            // Calculate discount
-            let discount = 0;
-            if (config.discount_type === 'percentage') {
-                discount = (subtotal * config.discount_value) / 100;
-            } else if (config.discount_type === 'fixed_amount') {
-                discount = config.discount_value;
-            }
-
-            setAppliedPromoCode(promoCode);
-            setPromoCodeDiscount(discount);
-            setPromoCodeError('');
         } catch (error) {
             console.error('Error applying promo code:', error);
             setPromoCodeError('Error al aplicar el código de promoción');
@@ -436,6 +419,7 @@ const OrderMenuView: React.FC<OrderMenuViewProps> = ({ onOrderSubmitted }) => {
                 clientInfo,
                 receipt_url: receiptUrl,
                 payment_method: paymentMethod,
+                promo_code: appliedPromoCode,
             };
             const newOrder = await api.submitCustomerOrder(orderData);
             setSubmittedOrder(newOrder);
@@ -681,6 +665,12 @@ const OrderMenuView: React.FC<OrderMenuViewProps> = ({ onOrderSubmitted }) => {
                         )}
                     </div>
 
+                    {promoCodeDiscount > 0 && (
+                        <div className="flex justify-between items-center mb-2">
+                            <p className="text-sm text-green-600">Descuento por promoción:</p>
+                            <p className="text-sm font-bold text-green-600">- {formatCurrencyCOP(promoCodeDiscount)}</p>
+                        </div>
+                    )}
                     <div className="flex justify-between items-center mb-3">
                         <p className="text-lg font-bold text-gray-800">Total:</p>
                         <p className="text-xl font-bold text-brand-primary">{formatCurrencyCOP(total)}</p>

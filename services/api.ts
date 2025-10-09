@@ -2371,3 +2371,5 @@ const selectProductsQuery = (options?: SelectProductsQueryOptions) => {
       ascending: options.orderBy.ascending ?? true,
         nullsFirst: options.orderBy.nullsFirst ?? false,
       });
+
+};

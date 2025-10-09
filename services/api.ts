@@ -1620,7 +1620,7 @@ export const api = {
     const rows = unwrap<SupabaseOrderRow[]>(response as SupabaseResponse<SupabaseOrderRow[]>);
     const orders = rows.map(mapOrderRow);
     return {
-      pending: orders.filter(order => order.statut === 'pendiente_validacion' || order.statut === 'en_cours'),
+      pending: orders.filter(order => order.statut === 'pendiente_validacion' && order.estado_cocina === 'no_enviado'),
       ready: orders.filter(order => order.estado_cocina === 'listo'),
     };
   },
@@ -2099,7 +2099,7 @@ export const api = {
     const orders = rows.map(mapOrderRow);
 
     return {
-      pendingTakeaway: orders.filter(order => order.type === 'a_emporter' && (order.statut === 'pendiente_validacion' || order.statut === 'en_cours')).length,
+      pendingTakeaway: orders.filter(order => order.type === 'a_emporter' && order.statut === 'pendiente_validacion' && order.estado_cocina === 'no_enviado').length,
       readyTakeaway: orders.filter(order => order.type === 'a_emporter' && order.estado_cocina === 'listo').length,
       kitchenOrders: orders.filter(order => order.estado_cocina === 'recibido').length,
       lowStockIngredients: (await fetchIngredients()).filter(

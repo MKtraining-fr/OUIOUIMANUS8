@@ -602,34 +602,38 @@ const selectOrdersQuery = () => supabase.from("orders").select(`
         order_items (
           id,
           order_id,
-          produit_id,
-          nom_produit,
-          prix_unitaire,
-          quantite,
-          excluded_ingredients,
-          commentaire,
-          estado,
-          date_envoi
-        )
-      `,
-    )
-    .order('date_creation', { ascending: false });
+     const buildProductSelectColumns = (includeBestSellerColumns: boolean, includeRecipes: boolean): string => {
+  const bestSellerColumns = includeBestSellerColumns
+    ? `,
+        is_best_seller,
+        best_seller_rank`
+    : '';
 
-type SelectProductsQueryOptions = {
-  orderBy?: { column: string; ascending?: boolean; nullsFirst?: boolean };
-  includeBestSellerColumns?: boolean;
-  includeRecipes?: boolean;
-}const selectProductsQuery = (options?: SelectProductsQueryOptions) => {
+  const recipeColumns = includeRecipes
+    ? `,
+        product_recipes (
+          ingredient_id,
+          qte_utilisee
+        )`
+    : '';
+
+  return `
+        id,
+        nom_produit,
+        description,
+        prix_vente,
+        categoria_id,
+        estado,
+        image${bestSellerColumns}${recipeColumns}
+      `;
+};
+
+const selectProductsQuery = (options?: SelectProductsQueryOptions) => {
   const includeBestSellerColumns = options?.includeBestSellerColumns !== false;
   const includeRecipes = options?.includeRecipes !== false;
-
   let query = supabase
-    .from("products")
-    .select(`
-      id, nom_produit, description, prix_vente, categoria_id, estado, image
-      ${includeBestSellerColumns ? ', is_best_seller, best_seller_rank' : ''}
-      ${includeRecipes ? ', product_recipes:product_recipes(ingredient_id, qte_utilisee)' : ''}
-    `);
+    .from('products')
+    .select(buildProductSelectColumns(includeBestSellerColumns, includeRecipes));
 
   if (options?.orderBy) {
     query = query.order(options.orderBy.column, {
@@ -637,15 +641,10 @@ type SelectProductsQueryOptions = {
       nullsFirst: options.orderBy.nullsFirst,
     });
   } else {
-    query = query.order("nom_produit");
+    query = query.order('nom_produit');
   }
 
   return query;
-};  if (includeRecipes) {
-    selectString += `, product_recipes:product_recipes(ingredient_id, qte_utilisee)`;
-  }
-
-  return selectString;
 };
 
 

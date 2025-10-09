@@ -1776,7 +1776,7 @@ export const api = {
               quantite: item.quantite,
               excluded_ingredients: item.excluded_ingredients ?? [],
               commentaire: item.commentaire,
-              estado: item.estado,
+              estado: item.estado ?? 'en_attente',
               date_envoi: item.date_envoi ? new Date(item.date_envoi).toISOString() : nowIso,
             })
             .eq('id', item.id),
@@ -2046,7 +2046,7 @@ export const api = {
           quantite: item.quantite,
           excluded_ingredients: item.excluded_ingredients ?? [],
           commentaire: item.commentaire,
-          estado: item.estado,
+          estado: item.estado ?? 'en_attente',
           date_envoi: item.date_envoi ? new Date(item.date_envoi).toISOString() : null,
         };
       });

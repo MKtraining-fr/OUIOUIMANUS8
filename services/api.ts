@@ -7,7 +7,6 @@ import {
   Table,
   Order,
   KitchenTicket,
-  TableStatus,
   Product,
   Category,
   Ingredient,
@@ -464,10 +463,6 @@ const mapOrderRow = (row: SupabaseOrderRow): Order => {
     payment_method: row.payment_method ?? undefined,
     payment_receipt_url: row.payment_receipt_url ?? undefined,
     receipt_url: row.receipt_url ?? undefined,
-    subtotal: toNumber(row.subtotal),
-    total_discount: toNumber(row.total_discount),
-    promo_code: row.promo_code ?? undefined,
-    applied_promotions: row.applied_promotions ?? undefined,
   };
 
   if (row.client_nom || row.client_telephone || row.client_adresse) {
@@ -579,11 +574,97 @@ const mapTableRowWithMeta = async (row: SupabaseTableRow): Promise<Table> => {
   return mapTableRow(row, orderMeta);
 };
 
-const selectOrdersQuery = () => supabase.from("orders").select(`
+const selectOrdersQuery = () =>
+  supabase
+    .from('orders')
+    .select(
+      `
         id,
-        statut
-      `);
+        type,
+        table_id,
+        table_nom,
+        couverts,
+        statut,
+        estado_cocina,
+        date_creation,
+        date_envoi_cuisine,
+        date_listo_cuisine,
+        date_servido,
+        payment_status,
+        total,
+        profit,
+        payment_method,
+        payment_receipt_url,
+        client_nom,
+        client_telephone,
+        client_adresse,
+        receipt_url,
+        order_items (
+          id,
+          order_id,
+          produit_id,
+          nom_produit,
+          prix_unitaire,
+          quantite,
+          excluded_ingredients,
+          commentaire,
+          estado,
+          date_envoi
+        )
+      `,
+    )
+    .order('date_creation', { ascending: false });
 
+type SelectProductsQueryOptions = {
+  orderBy?: { column: string; ascending?: boolean; nullsFirst?: boolean };
+  includeBestSellerColumns?: boolean;
+  includeRecipes?: boolean;
+};
+
+const buildProductSelectColumns = (includeBestSellerColumns: boolean, includeRecipes: boolean): string => {
+  const bestSellerColumns = includeBestSellerColumns
+    ? `,
+        is_best_seller,
+        best_seller_rank`
+    : '';
+
+  const recipeColumns = includeRecipes
+    ? `,
+        product_recipes (
+          ingredient_id,
+          qte_utilisee
+        )`
+    : '';
+
+  return `
+        id,
+        nom_produit,
+        description,
+        prix_vente,
+        categoria_id,
+        estado,
+        image${bestSellerColumns}${recipeColumns}
+      `;
+};
+
+const selectProductsQuery = (options?: SelectProductsQueryOptions) => {
+  const includeBestSellerColumns = options?.includeBestSellerColumns !== false;
+  const includeRecipes = options?.includeRecipes !== false;
+  let query = supabase
+    .from('products')
+    .select(buildProductSelectColumns(includeBestSellerColumns, includeRecipes));
+
+  if (options?.orderBy) {
+    query = query.order(options.orderBy.column, {
+      ascending: options.orderBy.ascending ?? true,
+      nullsFirst: options.orderBy.nullsFirst,
+    });
+  } else {
+    query = query.order('nom_produit');
+  }
+
+  return query;
+};
 
 const isMissingBestSellerColumnError = (error: { message?: string } | null): boolean => {
   if (!error?.message) {
@@ -623,74 +704,6 @@ const fetchOrderById = async (orderId: string): Promise<Order | null> => {
   const response = await selectOrdersQuery().eq('id', orderId).maybeSingle();
   const row = unwrapMaybe<SupabaseOrderRow>(response as SupabaseResponse<SupabaseOrderRow | null>);
   return row ? mapOrderRow(row) : null;
-};
-
-const fetchOrderItemsByOrderId = async (orderId: string): Promise<OrderItem[]> => {
-  const response = await supabase
-    .from('order_items')
-    .select(
-      `
-        id,
-        order_id,
-        produit_id,
-        nom_produit,
-        prix_unitaire,
-        quantite,
-        excluded_ingredients,
-        commentaire,
-        estado,
-        date_envoi
-      `,
-    )
-    .eq('order_id', orderId);
-
-  const rows = unwrap<SupabaseOrderItemRow[]>(response as SupabaseResponse<SupabaseOrderItemRow[]>);
-  return rows.map(mapOrderItemRow);
-};
-
-const ensureOrderHasItems = async (order: Order): Promise<Order> => {
-  if (order.items.length > 0) {
-    return order;
-  }
-
-  // Always try to fetch items directly from order_items table as a fallback
-  // This ensures items are retrieved even if the Supabase relation is not configured
-  const fallbackItems = await fetchOrderItemsByOrderId(order.id);
-  
-  if (fallbackItems.length === 0) {
-    // If still no items found, try enriched order as last resort
-    const enrichedOrder = await fetchOrderById(order.id);
-    return enrichedOrder ?? order;
-  }
-
-  const computedTotal = fallbackItems.reduce(
-    (sum, item) => sum + item.prix_unitaire * item.quantite,
-    0,
-  );
-
-  return {
-    ...order,
-    items: fallbackItems,
-    total: order.total > 0 ? order.total : computedTotal,
-  };
-};
-
-const TAKEAWAY_ORDER_TYPES: Order['type'][] = ['a_emporter', 'pedir_en_linea'];
-
-const isTakeawayLikeOrder = (order: Order): boolean => TAKEAWAY_ORDER_TYPES.includes(order.type);
-
-const isKitchenEligibleOrder = (order: Order): boolean => {
-  if (isTakeawayLikeOrder(order)) {
-    const isValidated = order.statut === 'en_cours';
-    const awaitingKitchen = order.estado_cocina === 'recibido' || order.estado_cocina === 'no_enviado';
-    return isValidated && awaitingKitchen && order.items.length > 0;
-  }
-
-  if (order.estado_cocina !== 'recibido') {
-    return false;
-  }
-
-  return order.items.some(item => item.estado === 'enviado');
 };
 
 const fetchIngredients = async (): Promise<Ingredient[]> => {
@@ -777,30 +790,7 @@ const fetchTablesWithMeta = async (): Promise<Table[]> => {
     );
   }
 
-  // Count ready orders (estado_cocina = 'listo') for each table
-  const readyOrdersCount = new Map<string, number>();
-  const allTableIds = tableRows.map(row => row.id);
-  
-  if (allTableIds.length > 0) {
-    const readyOrdersResponse = await supabase
-      .from('orders')
-      .select('table_id')
-      .in('table_id', allTableIds)
-      .eq('estado_cocina', 'listo')
-      .in('statut', ['en_cours']);
-    
-    const readyOrders = unwrap<{ table_id: string }[]>(readyOrdersResponse as SupabaseResponse<{ table_id: string }[]>);
-    
-    readyOrders.forEach(order => {
-      const count = readyOrdersCount.get(order.table_id) || 0;
-      readyOrdersCount.set(order.table_id, count + 1);
-    });
-  }
-
-  return tableRows.map(row => ({
-    ...mapTableRow(row, orderMeta),
-    readyOrdersCount: readyOrdersCount.get(row.id) || 0,
-  }));
+  return tableRows.map(row => mapTableRow(row, orderMeta));
 };
 
 export const getBusinessDayStart = (now: Date = new Date()): Date => {
@@ -828,117 +818,7 @@ const resolveDashboardPeriodBounds = (period: DashboardPeriod) => {
   return { config, start, end };
 };
 
-const updateTableStatusBasedOnOrders = async (tableId: string): Promise<void> => {
-  const { data: ordersData } = await supabase
-    .from("orders")
-    .select("id, estado_cocina, statut")
-    .eq("table_id", tableId)
-    .in("statut", ["en_cours"]); // Only consider active orders
-
-  if (!ordersData || ordersData.length === 0) {
-    // If no active orders, the table should be ready for payment or free
-    // This case should ideally be handled by finalizeOrder setting to libre
-    // For now, if no active orders, assume it\'s ready for payment if it wasn\'t already libre
-    const { data: currentTable } = await supabase
-      .from("restaurant_tables")
-      .select("statut")
-      .eq("id", tableId)
-      .single();
-    if (currentTable?.statut !== "libre") {
-      await supabase
-        .from("restaurant_tables")
-        .update({ statut: "para_pagar" })
-        .eq("id", tableId);
-    }
-    return;
-  }
-
-  // Fetch all items for these orders
-  const allOrderIds = ordersData.map(o => o.id);
-  const { data: itemsData } = await supabase
-    .from("order_items")
-    .select("estado")
-    .in("order_id", allOrderIds);
-
-  const allItems = itemsData || [];
-
-  const anyItemEnviado = allItems.some(item => item.estado === "enviado");
-  const anyItemListo = allItems.some(item => item.estado === "listo");
-  const anyItemServido = allItems.some(item => item.estado === "servido");
-  const anyItemEnAttente = allItems.some(item => item.estado === "en_attente");
-  const allItemsServido = allItems.every(item => item.estado === "servido");
-
-  let newTableStatus: string;
-  if (anyItemListo) {
-    // If any item is ready, the table is ready for delivery
-    newTableStatus = "para_entregar";
-  } else if (anyItemEnviado || anyItemEnAttente) {
-    // If any item is still in the kitchen (enviado) or pending (en_attente), the table is in cuisine
-    newTableStatus = "en_cuisine";
-  } else if (allItemsServido) {
-    // All items are served, so the table is ready for payment
-    newTableStatus = "para_pagar";
-  } else {
-    // Fallback: if no items are in any relevant state, assume en_cuisine (or libre if no orders at all)
-    newTableStatus = "en_cuisine";
-  }
-
-  await supabase
-    .from("restaurant_tables")
-    .update({ statut: newTableStatus })
-    .eq("id", tableId);
-};
-
-const createSalesEntriesForOrder = async (order: Order): Promise<void> => {
-  const { data: ordersData } = await supabase
-    .from("orders")
-    .select("id, estado_cocina, statut")
-    .eq("table_id", tableId)
-    .in("statut", ["en_cours"]); // Only consider active orders
-
-  if (!ordersData || ordersData.length === 0) {
-    // No active orders, table should be libre (or para_pagar if there were previous orders)
-    // For now, let's assume it should go to para_pagar if no active orders are found after serving
-    await supabase
-      .from("restaurant_tables")
-      .update({ statut: "para_pagar" })
-      .eq("id", tableId);
-    return;
-  }
-
-  // Fetch all items for these orders
-  const allOrderIds = ordersData.map(o => o.id);
-  const { data: itemsData } = await supabase
-    .from("order_items")
-    .select("estado")
-    .in("order_id", allOrderIds);
-
-  const allItems = itemsData || [];
-
-  const allItemsServed = allItems.every(item => item.estado === "servido");
-  const allItemsReady = allItems.every(item => item.estado === "listo" || item.estado === "servido");
-  const anyItemInKitchen = allItems.some(item => item.estado === "enviado");
-
-  let newTableStatus: Table["statut"];
-
-  if (allItemsServed) {
-    newTableStatus = "para_pagar";
-  } else if (allItemsReady) {
-    newTableStatus = "para_entregar";
-  } else if (anyItemInKitchen) {
-    newTableStatus = "en_cuisine";
-  } else {
-    // Fallback, if no items are in kitchen, ready or served, it means they are not sent yet or something is wrong
-    newTableStatus = "en_cuisine"; // Or 'libre' if no items at all
-  }
-
-  await supabase
-    .from("restaurant_tables")
-    .update({ statut: newTableStatus })
-    .eq("id", tableId);
-};
-
-  createSalesEntriesForOrder: async (order: Order): Promise<number> => {
+const createSalesEntriesForOrder = async (order: Order): Promise<number> => {
   if (!order.items.length) {
     await supabase.from('sales').delete().eq('order_id', order.id);
     await supabase.from('orders').update({ profit: 0 }).eq('id', order.id);
@@ -956,7 +836,7 @@ const createSalesEntriesForOrder = async (order: Order): Promise<void> => {
     productsPromise,
   ]);
 
-  const ingredientMap = new Map(ingredients.map(ingredient => [ingredient.id, ingredient]));
+  const ingredientMap = new Map(ingredients.map(ing => [ing.id, ing]));
   const categoryMap = new Map(categories.map(category => [category.id, category.nom]));
 
   let productRows: SupabaseProductRow[] = [];
@@ -1119,7 +999,7 @@ export const api = {
     return mapRoleRow(row, true);
   },
 
-  updateRole: async (roleId: string, updates: Omit<Role, 'id'>): Promise<Role> => {
+  updateRole: async (roleId: string, updates: Partial<Omit<Role, 'id'>>): Promise<Role> => {
     const response = await supabase
       .from('roles')
       .update({
@@ -1203,6 +1083,39 @@ export const api = {
       }),
     );
 
+    const saleDateIso = toIsoString(todaysOrders[0]?.date_servido) ?? new Date().toISOString();
+    const salesEntries = todaysOrders.flatMap(order =>
+      order.items.map(item => {
+        const product = productMap.get(item.produitRef);
+        const cost = product ? calculateCost(product.recipe, ingredientMap) : 0;
+        const categoryId = product?.categoria_id ?? 'unknown';
+        const categoryName = product ? categoryMap.get(categoryId) ?? 'Sans catégorie' : 'Sans catégorie';
+        const profit = (item.prix_unitaire - cost) * item.quantite;
+
+        return {
+          order_id: order.id,
+          product_id: item.produitRef,
+          product_name: item.nom_produit,
+          category_id: categoryId,
+          category_name: categoryName,
+          quantity: item.quantite,
+          unit_price: item.prix_unitaire,
+          total_price: item.prix_unitaire * item.quantite,
+          unit_cost: cost,
+          total_cost: cost * item.quantite,
+          profit,
+          payment_method: order.payment_method ?? null,
+          sale_date: saleDateIso,
+        };
+      }),
+    );
+
+    const ventesDuJour = salesEntries.reduce((sum, entry) => sum + entry.total_price, 0);
+    const beneficeDuJour = salesEntries.reduce((sum, entry) => sum + entry.profit, 0);
+
+    const clientsDuJour = todaysOrders.reduce((sum, order) => sum + (order.couverts ?? 0), 0);
+    const panierMoyenDuJour = todaysOrders.length > 0 ? ventesDuJour / todaysOrders.length : 0;
+
     const ventesPeriode = currentPeriodOrders.reduce((sum, order) => sum + (order.total ?? 0), 0);
     const beneficePeriode = currentPeriodOrders.reduce((profit, order) => {
       return (
@@ -1217,8 +1130,6 @@ export const api = {
 
     const clientsPeriode = currentPeriodOrders.reduce((sum, order) => sum + (order.couverts ?? 0), 0);
     const panierMoyen = currentPeriodOrders.length > 0 ? ventesPeriode / currentPeriodOrders.length : 0;
-
-    const categoryMap = new Map(categories.map(category => [category.id, category.nom]));
 
     const ventesParCategorieMap = new Map<string, number>();
     currentPeriodOrders.forEach(order => {
@@ -1422,6 +1333,24 @@ export const api = {
     return rows.map(row => mapProductRow(row, ingredientMap));
   },
 
+  getProductById: async (productId: string): Promise<Product | null> => {
+    const [productResponse, ingredients] = await Promise.all([
+      runProductsQueryWithFallback(query => query.eq('id', productId).maybeSingle()),
+      fetchIngredientsOrWarn('getProductById'),
+    ]);
+
+    const productRow = unwrapMaybe<SupabaseProductRow>(productResponse as SupabaseResponse<SupabaseProductRow | null>);
+    if (!productRow) {
+      return null;
+    }
+
+    const ingredientMap = ingredients.length > 0
+      ? new Map(ingredients.map(ingredient => [ingredient.id, ingredient]))
+      : undefined;
+
+    return mapProductRow(productRow, ingredientMap);
+  },
+
   getBestSellerProducts: async (): Promise<Product[]> => {
     const [productsResponse, ingredients] = await Promise.all([
       runProductsQueryWithFallback((query, includeBestSellerColumns) => {
@@ -1455,31 +1384,211 @@ export const api = {
     return fetchCategories();
   },
 
+  createProduct: async (product: Omit<Product, 'id' | 'image'>, imageFile?: File): Promise<Product> => {
+    let imageUrl: string | undefined;
+    if (imageFile) {
+      imageUrl = await supabase.storage
+        .from('product-images')
+        .upload(`${product.nom_produit}-${Date.now()}`, imageFile)
+        .then(response => {
+          if (response.error) {
+            throw response.error;
+          }
+          return response.data?.path;
+        });
+    }
+
+    const response = await supabase
+      .from('products')
+      .insert({
+        nom_produit: product.nom_produit,
+        description: product.description ?? null,
+        prix_vente: product.prix_vente,
+        categoria_id: product.categoria_id,
+        estado: product.estado,
+        image: imageUrl ?? null,
+      })
+      .select('id, nom_produit, description, prix_vente, categoria_id, estado, image')
+      .single();
+
+    const productRow = unwrap<SupabaseProductRow>(response as SupabaseResponse<SupabaseProductRow>);
+
+    if (product.recipe.length > 0) {
+      await supabase.from('product_recipes').insert(
+        product.recipe.map(item => ({
+          product_id: productRow.id,
+          ingredient_id: item.ingredient_id,
+          qte_utilisee: item.qte_utilisee,
+        })),
+      );
+    }
+
+    publishOrderChange();
+    return mapProductRow({ ...productRow, product_recipes: product.recipe.map(item => ({ ...item, product_id: productRow.id })) });
+  },
+
+  updateProduct: async (
+    productId: string,
+    updates: Partial<Omit<Product, 'id' | 'image'>>,
+    imageFile?: File,
+  ): Promise<Product> => {
+    let imageUrl: string | undefined | null = undefined;
+    if (imageFile) {
+      imageUrl = await supabase.storage
+        .from('product-images')
+        .upload(`${updates.nom_produit ?? productId}-${Date.now()}`, imageFile)
+        .then(response => {
+          if (response.error) {
+            throw response.error;
+          }
+          return response.data?.path;
+        });
+    } else if ('image' in updates && updates.image === null) {
+      imageUrl = null; // Explicitly remove image
+    }
+
+    const payload: Record<string, unknown> = {};
+    if (updates.nom_produit !== undefined) payload.nom_produit = updates.nom_produit;
+    if (updates.description !== undefined) payload.description = updates.description;
+    if (updates.prix_vente !== undefined) payload.prix_vente = updates.prix_vente;
+    if (updates.categoria_id !== undefined) payload.categoria_id = updates.categoria_id;
+    if (updates.estado !== undefined) payload.estado = updates.estado;
+    if (imageUrl !== undefined) payload.image = imageUrl;
+
+    if (Object.keys(payload).length > 0) {
+      await supabase.from('products').update(payload).eq('id', productId);
+    }
+
+    if (updates.recipe) {
+      await supabase.from('product_recipes').delete().eq('product_id', productId);
+      if (updates.recipe.length > 0) {
+        await supabase.from('product_recipes').insert(
+          updates.recipe.map(item => ({
+            product_id: productId,
+            ingredient_id: item.ingredient_id,
+            qte_utilisee: item.qte_utilisee,
+          })),
+        );
+      }
+    }
+
+    publishOrderChange();
+    const updatedProduct = await api.getProductById(productId);
+    if (!updatedProduct) {
+      throw new Error('Product not found after update');
+    }
+    return updatedProduct;
+  },
+
+  deleteProduct: async (productId: string): Promise<void> => {
+    const product = await api.getProductById(productId);
+    if (product?.image) {
+      const imagePath = product.image.split('/').pop();
+      if (imagePath) {
+        await supabase.storage.from('product-images').remove([imagePath]);
+      }
+    }
+    await supabase.from('product_recipes').delete().eq('product_id', productId);
+    await supabase.from('products').delete().eq('id', productId);
+    publishOrderChange();
+  },
+
+  createCategory: async (payload: Omit<Category, 'id'>): Promise<Category> => {
+    const response = await supabase
+      .from('categories')
+      .insert(payload)
+      .select('id, nom')
+      .single();
+    const row = unwrap<SupabaseCategoryRow>(response as SupabaseResponse<SupabaseCategoryRow>);
+    publishOrderChange();
+    return mapCategoryRow(row);
+  },
+
+  updateCategory: async (categoryId: string, updates: Partial<Omit<Category, 'id'>>): Promise<Category> => {
+    const response = await supabase
+      .from('categories')
+      .update(updates)
+      .eq('id', categoryId)
+      .select('id, nom')
+      .single();
+    const row = unwrap<SupabaseCategoryRow>(response as SupabaseResponse<SupabaseCategoryRow>);
+    publishOrderChange();
+    return mapCategoryRow(row);
+  },
+
+  deleteCategory: async (categoryId: string): Promise<void> => {
+    await supabase.from('categories').delete().eq('id', categoryId);
+    publishOrderChange();
+  },
+
+  createIngredient: async (
+    newIngredientData: Omit<Ingredient, 'id' | 'stock_actuel' | 'prix_unitaire'>,
+  ): Promise<Ingredient> => {
+    const response = await supabase
+      .from('ingredients')
+      .insert({
+        nom: newIngredientData.nom,
+        unite: newIngredientData.unite,
+        stock_minimum: newIngredientData.stock_minimum,
+        stock_actuel: 0,
+        prix_unitaire: 0,
+      })
+      .select('id, nom, unite, stock_minimum, stock_actuel, prix_unitaire')
+      .single();
+    const row = unwrap<SupabaseIngredientRow>(response as SupabaseResponse<SupabaseIngredientRow>);
+    notificationsService.publish('notifications_updated');
+    return mapIngredientRow(row);
+  },
+
+  updateIngredient: async (
+    ingredientId: string,
+    updates: Partial<Omit<Ingredient, 'id'>>,
+  ): Promise<Ingredient> => {
+    const response = await supabase
+      .from('ingredients')
+      .update(updates)
+      .eq('id', ingredientId)
+      .select('id, nom, unite, stock_minimum, stock_actuel, prix_unitaire')
+      .single();
+    const row = unwrap<SupabaseIngredientRow>(response as SupabaseResponse<SupabaseIngredientRow>);
+    notificationsService.publish('notifications_updated');
+    return mapIngredientRow(row);
+  },
+
+  deleteIngredient: async (ingredientId: string): Promise<{ success: boolean }> => {
+    const relatedRecipesResponse = await supabase
+      .from('product_recipes')
+      .select('ingredient_id, product_id, qte_utilisee')
+      .eq('ingredient_id', ingredientId)
+      .limit(1);
+
+    const { data: relatedRecipes } = relatedRecipesResponse;
+
+    if (relatedRecipes && relatedRecipes.length > 0) {
+      return { success: false };
+    }
+
+    await supabase.from('ingredients').delete().eq('id', ingredientId);
+    notificationsService.publish('notifications_updated');
+    return { success: true };
+  },
+
   getKitchenOrders: async (): Promise<KitchenTicket[]> => {
     const response = await selectOrdersQuery()
-      .in('estado_cocina', ['recibido', 'no_enviado'])
-      .neq('statut', 'finalisee');
+      .eq('estado_cocina', 'recibido')
+      .or('statut.eq.en_cours,type.eq.a_emporter');
     const rows = unwrap<SupabaseOrderRow[]>(response as SupabaseResponse<SupabaseOrderRow[]>);
-    const orders = await Promise.all(rows.map(row => ensureOrderHasItems(mapOrderRow(row))));
+    const orders = rows.map(mapOrderRow);
 
     const tickets: KitchenTicket[] = [];
 
-    const eligibleOrders = orders.filter(isKitchenEligibleOrder);
-
-    eligibleOrders.forEach(order => {
+    orders.forEach(order => {
       const sentItems = order.items.filter(item => item.estado === 'enviado');
-      const itemsForTicket =
-        sentItems.length > 0
-          ? sentItems
-          : isTakeawayLikeOrder(order)
-            ? order.items
-            : [];
-
-      if (itemsForTicket.length === 0) {
+      if (sentItems.length === 0) {
         return;
       }
 
-      const groups = itemsForTicket.reduce((acc, item) => {
+      const groups = sentItems.reduce((acc, item) => {
         const key = item.date_envoi ?? order.date_envoi_cuisine ?? order.date_creation;
         const group = acc.get(key) ?? [];
         group.push(item);
@@ -1505,9 +1614,9 @@ export const api = {
   },
 
   getTakeawayOrders: async (): Promise<{ pending: Order[]; ready: Order[] }> => {
-    const response = await selectOrdersQuery().in('type', TAKEAWAY_ORDER_TYPES);
+    const response = await selectOrdersQuery().eq('type', 'a_emporter');
     const rows = unwrap<SupabaseOrderRow[]>(response as SupabaseResponse<SupabaseOrderRow[]>);
-    const orders = await Promise.all(rows.map(row => ensureOrderHasItems(mapOrderRow(row))));
+    const orders = rows.map(mapOrderRow);
     return {
       pending: orders.filter(order => order.statut === 'pendiente_validacion'),
       ready: orders.filter(order => order.estado_cocina === 'listo'),
@@ -1591,8 +1700,84 @@ export const api = {
         .update({ statut: 'libre', commande_id: null, couverts: null })
         .eq('id', existingOrder.table_id);
     }
+    publishOrderChange();
+  },
+
+  addOrderItems: async (orderId: string, items: Omit<OrderItem, 'id'>[]): Promise<Order> => {
+    const nowIso = new Date().toISOString();
+    const itemsWithOrderId = items.map(item => ({
+      ...item,
+      order_id: orderId,
+      estado: 'en_attente',
+      date_envoi: nowIso,
+    }));
+
+    await supabase.from('order_items').insert(itemsWithOrderId);
 
     publishOrderChange();
+    const updatedOrder = await fetchOrderById(orderId);
+    if (!updatedOrder) {
+      throw new Error('Order not found after adding items');
+    }
+    return updatedOrder;
+  },
+
+  updateOrderItems: async (orderId: string, items: OrderItem[]): Promise<Order> => {
+    const existingOrder = await fetchOrderById(orderId);
+    if (!existingOrder) {
+      throw new Error('Order not found');
+    }
+
+    const existingItemIds = new Set(existingOrder.items.map(item => item.id));
+    const incomingItemIds = new Set(items.map(item => item.id));
+
+    const itemsToInsert = items.filter(item => !existingItemIds.has(item.id));
+    const itemsToUpdate = items.filter(item => existingItemIds.has(item.id));
+    const itemsToDelete = existingOrder.items.filter(item => !incomingItemIds.has(item.id));
+
+    const nowIso = new Date().toISOString();
+
+    if (itemsToInsert.length > 0) {
+      await supabase.from('order_items').insert(
+        itemsToInsert.map(item => ({
+          ...item,
+          order_id: orderId,
+          estado: 'en_attente',
+          date_envoi: nowIso,
+        })),
+      );
+    }
+
+    if (itemsToUpdate.length > 0) {
+      await Promise.all(
+        itemsToUpdate.map(item =>
+          supabase
+            .from('order_items')
+            .update({
+              produit_id: item.produitRef,
+              nom_produit: item.nom_produit,
+              prix_unitaire: item.prix_unitaire,
+              quantite: item.quantite,
+              excluded_ingredients: item.excluded_ingredients,
+              commentaire: item.commentaire,
+              estado: item.estado,
+              date_envoi: item.date_envoi ? new Date(item.date_envoi).toISOString() : nowIso,
+            })
+            .eq('id', item.id),
+        ),
+      );
+    }
+
+    if (itemsToDelete.length > 0) {
+      await supabase.from('order_items').delete().in('id', itemsToDelete.map(item => item.id));
+    }
+
+    publishOrderChange();
+    const updatedOrder = await fetchOrderById(orderId);
+    if (!updatedOrder) {
+      throw new Error('Order not found after item update');
+    }
+    return updatedOrder;
   },
 
   updateOrder: async (
@@ -1600,36 +1785,8 @@ export const api = {
     updates: Partial<Order> & { removedItemIds?: string[] },
     options?: PublishOrderChangeOptions,
   ): Promise<Order> => {
-    const existingOrder = await fetchOrderById(orderId);
-    if (!existingOrder) {
-      throw new Error('Order not found');
-    }
-
-    let items = existingOrder.items;
+    let items: OrderItem[] | undefined;
     if (updates.items) {
-      const payload = updates.items.map(item => {
-        const payloadItem: Record<string, unknown> = {
-          order_id: orderId,
-          produit_id: item.produitRef,
-          nom_produit: item.nom_produit,
-          prix_unitaire: item.prix_unitaire,
-          quantite: item.quantite,
-          excluded_ingredients: item.excluded_ingredients,
-          commentaire: item.commentaire,
-          estado: item.estado,
-          date_envoi: toIsoString(item.date_envoi) ?? null,
-        };
-
-        if (isUuid(item.id)) {
-          payloadItem.id = item.id;
-        }
-
-        return payloadItem;
-      });
-
-      if (payload.length > 0) {
-        await supabase.from('order_items').upsert(payload, { defaultToNull: false });
-      }
       items = updates.items;
     }
 
@@ -1741,53 +1898,19 @@ export const api = {
     return updatedOrder;
   },
 
-  markOrderAsReady: async (orderId: string, ticketTimestamp?: number): Promise<Order> => {
+  markOrderAsReady: async (orderId: string): Promise<Order> => {
     const nowIso = new Date().toISOString();
+    await supabase
+      .from('orders')
+      .update({ estado_cocina: 'listo', date_listo_cuisine: nowIso })
+      .eq('id', orderId);
+
     const order = await fetchOrderById(orderId);
-    
-    if (!order) {
-      throw new Error('Order not found');
-    }
-
-    // If ticketTimestamp is provided, only mark items from that specific ticket as ready
-    if (ticketTimestamp !== undefined) {
-      // Get all items for this order
-      const itemsToUpdate = order.items.filter(item => {
-        const itemTimestamp = item.date_envoi ?? order.date_envoi_cuisine ?? order.date_creation;
-        return itemTimestamp === ticketTimestamp;
-      });
-
-      // Update each item's estado to 'listo'
-      for (const item of itemsToUpdate) {
-        await supabase
-          .from('order_items')
-          .update({ estado: 'listo' })
-          .eq('id', item.id);
-      }
-
-      // Check if ALL items in the order are now ready
-      const allItemsReady = order.items.every(item => {
-        const itemTimestamp = item.date_envoi ?? order.date_envoi_cuisine ?? order.date_creation;
-        return itemTimestamp === ticketTimestamp || item.estado === 'listo' || item.estado === 'servido';
-      });
-
-      if (allItemsReady) {
-        await supabase
-          .from("orders")
-          .update({ estado_cocina: "listo", date_listo_cuisine: nowIso })
-          .eq("id", orderId);
-      }
-
-      if (order.table_id) {
-        await updateTableStatusBasedOnOrders(order.table_id);
-      }
-
-      publishOrderChange();
-      const updatedOrder = await fetchOrderById(orderId);
-      if (!updatedOrder) {
-        throw new Error('Order not found after ready update');
-      }
-      return updatedOrder;
+    if (order?.table_id) {
+      await supabase
+        .from('restaurant_tables')
+        .update({ statut: 'para_entregar' })
+        .eq('id', order.table_id);
     }
 
     publishOrderChange();
@@ -1801,30 +1924,26 @@ export const api = {
   markOrderAsServed: async (orderId: string): Promise<Order> => {
     const existingOrder = await fetchOrderById(orderId);
     if (!existingOrder) {
-      throw new Error("Order not found");
+      throw new Error('Order not found');
     }
 
     const nowIso = new Date().toISOString();
     await supabase
-      .from("orders")
-      .update({ estado_cocina: "servido", date_servido: nowIso })
-      .eq("id", orderId);
-
-    // Update individual order items to 'servido'
-    await supabase
-      .from("order_items")
-      .update({ estado: "servido" })
-      .eq("order_id", orderId)
-      .eq("estado", "listo"); // Only mark items that were 'listo'
+      .from('orders')
+      .update({ estado_cocina: 'servido', date_servido: nowIso })
+      .eq('id', orderId);
 
     if (existingOrder.table_id) {
-      await updateTableStatusBasedOnOrders(existingOrder.table_id);
+      await supabase
+        .from('restaurant_tables')
+        .update({ statut: 'para_pagar' })
+        .eq('id', existingOrder.table_id);
     }
 
     publishOrderChange();
     const updatedOrder = await fetchOrderById(orderId);
     if (!updatedOrder) {
-      throw new Error("Order not found after serve update");
+      throw new Error('Order not found after serve update');
     }
     return updatedOrder;
   },
@@ -1848,7 +1967,10 @@ export const api = {
       .eq('id', orderId);
 
     if (order.table_id) {
-      await updateTableStatusBasedOnOrders(order.table_id);
+      await supabase
+        .from('restaurant_tables')
+        .update({ statut: 'libre', commande_id: null, couverts: null })
+        .eq('id', order.table_id);
     }
 
     publishOrderChange();
@@ -1864,7 +1986,6 @@ export const api = {
     items: OrderItem[];
     clientInfo: Order['clientInfo'];
     receipt_url?: string;
-    payment_method?: Order['payment_method'];
   }): Promise<Order> => {
     const now = new Date();
     const nowIso = now.toISOString();
@@ -1872,13 +1993,12 @@ export const api = {
     const insertResponse = await supabase
       .from('orders')
       .insert({
-        type: 'pedir_en_linea',
+        type: 'a_emporter',
         couverts: 1,
         statut: 'pendiente_validacion',
         estado_cocina: 'no_enviado',
         date_creation: nowIso,
         payment_status: 'unpaid',
-        payment_method: orderData.payment_method ?? null,
         total: orderData.items.reduce((sum, item) => sum + item.prix_unitaire * item.quantite, 0),
         client_nom: orderData.clientInfo?.nom ?? null,
         client_telephone: orderData.clientInfo?.telephone ?? null,
@@ -1890,35 +2010,28 @@ export const api = {
     const orderRow = unwrap<SupabaseOrderRow>(insertResponse as SupabaseResponse<SupabaseOrderRow>);
 
     if (orderData.items.length > 0) {
-      const itemsPayload = orderData.items.map(item => {
-        const payloadItem: Record<string, unknown> = {
-          order_id: orderRow.id,
-          // Convert empty string or invalid UUID to null for special items (e.g., delivery fee)
-          produit_id: item.produitRef && isUuid(item.produitRef) ? item.produitRef : null,
-          nom_produit: item.nom_produit,
-          prix_unitaire: item.prix_unitaire,
-          quantite: item.quantite,
-          excluded_ingredients: item.excluded_ingredients,
-          commentaire: item.commentaire,
-          estado: item.estado,
-          date_envoi: item.date_envoi ? new Date(item.date_envoi).toISOString() : null,
-        };
+      await supabase.from('order_items').insert(
+        orderData.items.map(item => {
+          const payloadItem: Record<string, unknown> = {
+            order_id: orderRow.id,
+            produit_id: item.produitRef,
+            nom_produit: item.nom_produit,
+            prix_unitaire: item.prix_unitaire,
+            quantite: item.quantite,
+            excluded_ingredients: item.excluded_ingredients,
+            commentaire: item.commentaire,
+            estado: item.estado,
+            date_envoi: item.date_envoi ? new Date(item.date_envoi).toISOString() : null,
+          };
 
-        if (isUuid(item.id)) {
-          payloadItem.id = item.id;
-        }
+          if (isUuid(item.id)) {
+            payloadItem.id = item.id;
+          }
 
-        return payloadItem;
-      });
-
-      const insertItemsResponse = await supabase
-        .from('order_items')
-        .insert(itemsPayload, { defaultToNull: false });
-
-      if (insertItemsResponse.error) {
-        console.error('Failed to insert order items:', insertItemsResponse.error);
-        throw new Error(`Failed to insert order items: ${insertItemsResponse.error.message}`);
-      }
+          return payloadItem;
+        }),
+        { defaultToNull: false },
+      );
     }
 
     publishOrderChange();
@@ -1983,9 +2096,9 @@ export const api = {
     const orders = rows.map(mapOrderRow);
 
     return {
-      pendingTakeaway: orders.filter(order => isTakeawayLikeOrder(order) && order.statut === 'pendiente_validacion').length,
-      readyTakeaway: orders.filter(order => isTakeawayLikeOrder(order) && order.estado_cocina === 'listo').length,
-      kitchenOrders: (await api.getKitchenOrders()).length,
+      pendingTakeaway: orders.filter(order => order.type === 'a_emporter' && order.statut === 'pendiente_validacion').length,
+      readyTakeaway: orders.filter(order => order.type === 'a_emporter' && order.estado_cocina === 'listo').length,
+      kitchenOrders: orders.filter(order => order.estado_cocina === 'recibido').length,
       lowStockIngredients: (await fetchIngredients()).filter(
         ingredient => ingredient.stock_actuel <= ingredient.stock_minimum,
       ).length,
@@ -2023,8 +2136,8 @@ export const api = {
       return referenceDate >= startTime && referenceDate <= endTime;
     });
 
-    const ventesDuJour = orders.reduce((sum, order) => sum + order.total, 0);
-    const clientsDuJour = orders.reduce((sum, order) => sum + order.couverts, 0);
+    const ventesDuJour = orders.reduce((sum, order) => sum + (order.total ?? 0), 0);
+    const clientsDuJour = orders.reduce((sum, order) => sum + (order.couverts ?? 0), 0);
     const panierMoyen = orders.length > 0 ? ventesDuJour / orders.length : 0;
 
     const ingredientMap = new Map(ingredients.map(ingredient => [ingredient.id, ingredient]));
@@ -2093,283 +2206,9 @@ export const api = {
     const rows = unwrap<SupabaseOrderRow[]>(response as SupabaseResponse<SupabaseOrderRow[]>);
     return rows.map(mapOrderRow);
   },
-
-  addIngredient: async (
-    newIngredientData: Omit<Ingredient, 'id' | 'stock_actuel' | 'prix_unitaire'>,
-  ): Promise<Ingredient> => {
-    const response = await supabase
-      .from('ingredients')
-      .insert({
-        nom: newIngredientData.nom,
-        unite: newIngredientData.unite,
-        stock_minimum: newIngredientData.stock_minimum,
-        stock_actuel: 0,
-        prix_unitaire: 0,
-      })
-      .select('id, nom, unite, stock_minimum, stock_actuel, prix_unitaire')
-      .single();
-    const row = unwrap<SupabaseIngredientRow>(response as SupabaseResponse<SupabaseIngredientRow>);
-    notificationsService.publish('notifications_updated');
-    return mapIngredientRow(row);
+  logins: {
+    fetchSince: fetchRoleLoginsSince,
+    clearBefore: clearRoleLoginsBefore,
+    log: logRoleLogin,
   },
-
-  updateIngredient: async (
-    ingredientId: string,
-    updates: Partial<Omit<Ingredient, 'id'>>,
-  ): Promise<Ingredient> => {
-    const response = await supabase
-      .from('ingredients')
-      .update(updates)
-      .eq('id', ingredientId)
-      .select('id, nom, unite, stock_minimum, stock_actuel, prix_unitaire')
-      .single();
-    const row = unwrap<SupabaseIngredientRow>(response as SupabaseResponse<SupabaseIngredientRow>);
-    notificationsService.publish('notifications_updated');
-    return mapIngredientRow(row);
-  },
-
-  deleteIngredient: async (ingredientId: string): Promise<{ success: boolean }> => {
-    const relatedRecipesResponse = await supabase
-      .from('product_recipes')
-      .select('ingredient_id, product_id, qte_utilisee')
-      .eq('ingredient_id', ingredientId)
-      .limit(1);
-
-    const relatedRecipes = unwrap<SupabaseRecipeRow[]>(
-      relatedRecipesResponse as SupabaseResponse<SupabaseRecipeRow[]>,
-    );
-
-    if (relatedRecipes.length > 0) {
-      throw new Error("Impossible de supprimer l'ingrédient car il est utilisé dans une recette.");
-    }
-
-    await supabase.from('ingredients').delete().eq('id', ingredientId);
-    notificationsService.publish('notifications_updated');
-    return { success: true };
-  },
-
-  resupplyIngredient: async (ingredientId: string, quantity: number, unitPrice: number): Promise<Ingredient> => {
-    const ingredientResponse = await supabase
-      .from('ingredients')
-      .select('id, nom, unite, stock_minimum, stock_actuel, prix_unitaire')
-      .eq('id', ingredientId)
-      .maybeSingle();
-    const ingredientRow = unwrapMaybe<SupabaseIngredientRow>(
-      ingredientResponse as SupabaseResponse<SupabaseIngredientRow | null>,
-    );
-    if (!ingredientRow) {
-      throw new Error('Ingredient not found');
-    }
-
-    const currentStockValue = ingredientRow.prix_unitaire * ingredientRow.stock_actuel;
-    const totalCost = quantity * unitPrice;
-    const newStock = ingredientRow.stock_actuel + quantity;
-    const newWeightedPrice = newStock > 0 ? (currentStockValue + totalCost) / newStock : 0;
-
-    await supabase
-      .from('ingredients')
-      .update({
-        stock_actuel: newStock,
-        prix_unitaire: Number.isFinite(newWeightedPrice) ? newWeightedPrice : 0,
-      })
-      .eq('id', ingredientId);
-
-    await supabase.from('purchases').insert({
-      ingredient_id: ingredientId,
-      quantite_achetee: quantity,
-      prix_total: totalCost,
-      date_achat: new Date().toISOString(),
-    });
-
-    notificationsService.publish('notifications_updated');
-    const refreshedIngredient = await supabase
-      .from('ingredients')
-      .select('id, nom, unite, stock_minimum, stock_actuel, prix_unitaire')
-      .eq('id', ingredientId)
-      .single();
-    const refreshedRow = unwrap<SupabaseIngredientRow>(refreshedIngredient as SupabaseResponse<SupabaseIngredientRow>);
-    return mapIngredientRow(refreshedRow);
-  },
-
-  addProduct: async (product: Omit<Product, 'id'>): Promise<Product> => {
-    const insertResponse = await supabase
-      .from('products')
-      .insert({
-        nom_produit: product.nom_produit,
-        description: product.description ?? null,
-        prix_vente: product.prix_vente,
-        categoria_id: product.categoria_id,
-        estado: product.estado,
-        image: normalizeCloudinaryImageUrl(product.image),
-        is_best_seller: product.is_best_seller,
-        best_seller_rank: product.is_best_seller ? product.best_seller_rank : null,
-      })
-      .select('id')
-      .single();
-    const insertedRow = unwrap<{ id: string }>(insertResponse as SupabaseResponse<{ id: string }>);
-
-    if (product.recipe.length > 0) {
-      await supabase.from('product_recipes').insert(
-        product.recipe.map(item => ({
-          product_id: insertedRow.id,
-          ingredient_id: item.ingredient_id,
-          qte_utilisee: item.qte_utilisee,
-        })),
-      );
-    }
-
-    notificationsService.publish('notifications_updated');
-    const productsResponse = await runProductsQueryWithFallback(
-      query => query.eq('id', insertedRow.id).single(),
-    );
-    const productRow = unwrap<SupabaseProductRow>(productsResponse as SupabaseResponse<SupabaseProductRow>);
-    const ingredients = await fetchIngredients();
-    const ingredientMap = new Map(ingredients.map(ingredient => [ingredient.id, ingredient]));
-    return mapProductRow(productRow, ingredientMap);
-  },
-
-  updateProduct: async (productId: string, updates: Partial<Product>): Promise<Product> => {
-    const { recipe, ...rest } = updates;
-
-    const updatePayload: Record<string, unknown> = {};
-
-    if (rest.nom_produit !== undefined) {
-      updatePayload.nom_produit = rest.nom_produit;
-    }
-
-    if (rest.description !== undefined) {
-      updatePayload.description = rest.description ?? null;
-    }
-
-    if (rest.prix_vente !== undefined) {
-      updatePayload.prix_vente = rest.prix_vente;
-    }
-
-    if (rest.categoria_id !== undefined) {
-      updatePayload.categoria_id = rest.categoria_id;
-    }
-
-    if (rest.estado !== undefined) {
-      updatePayload.estado = rest.estado;
-    }
-
-    if (rest.image !== undefined) {
-      updatePayload.image = normalizeCloudinaryImageUrl(rest.image);
-    }
-
-    if (rest.best_seller_rank !== undefined) {
-      updatePayload.best_seller_rank = rest.best_seller_rank;
-    }
-
-    if (rest.is_best_seller !== undefined) {
-      updatePayload.is_best_seller = rest.is_best_seller;
-      if (!rest.is_best_seller) {
-        updatePayload.best_seller_rank = null;
-      }
-    }
-
-    if (Object.keys(updatePayload).length > 0) {
-      const updateResponse = await supabase.from('products').update(updatePayload).eq('id', productId);
-      unwrap(updateResponse as SupabaseResponse<unknown>);
-    }
-
-    if (recipe) {
-      const deleteRecipeResponse = await supabase.from('product_recipes').delete().eq('product_id', productId);
-      unwrap(deleteRecipeResponse as SupabaseResponse<unknown>);
-      if (recipe.length > 0) {
-        const insertRecipeResponse = await supabase.from('product_recipes').insert(
-          recipe.map(item => ({
-            product_id: productId,
-            ingredient_id: item.ingredient_id,
-            qte_utilisee: item.qte_utilisee,
-          })),
-        );
-        unwrap(insertRecipeResponse as SupabaseResponse<unknown>);
-      }
-    }
-
-    notificationsService.publish('notifications_updated');
-    const productsResponse = await runProductsQueryWithFallback(
-      query => query.eq('id', productId).single(),
-    );
-    const productRow = unwrap<SupabaseProductRow>(productsResponse as SupabaseResponse<SupabaseProductRow>);
-    const ingredients = await fetchIngredients();
-    const ingredientMap = new Map(ingredients.map(ingredient => [ingredient.id, ingredient]));
-    return mapProductRow(productRow, ingredientMap);
-  },
-
-  deleteProduct: async (productId: string): Promise<void> => {
-    await supabase.from('product_recipes').delete().eq('product_id', productId);
-    await supabase.from('products').delete().eq('id', productId);
-    notificationsService.publish('notifications_updated');
-  },
-
-  addCategory: async (name: string): Promise<Category> => {
-    const response = await supabase
-      .from('categories')
-      .insert({ nom: name })
-      .select('id, nom')
-      .single();
-    const row = unwrap<SupabaseCategoryRow>(response as SupabaseResponse<SupabaseCategoryRow>);
-    notificationsService.publish('notifications_updated');
-    return mapCategoryRow(row);
-  },
-
-  deleteCategory: async (categoryId: string): Promise<void> => {
-    await supabase.from('categories').delete().eq('id', categoryId);
-    notificationsService.publish('notifications_updated');
-  },
-};
-
-
-          order_id
-
-
-
-
-
-
-
-
-
-
-const buildProductSelectColumns = (includeBestSellerColumns: boolean, includeRecipes: boolean): string => {
-  const bestSellerColumns = includeBestSellerColumns
-    ? `,
-        is_best_seller,
-        best_seller_rank`
-    : '';
-
-  const recipeColumns = includeRecipes
-    ? `,
-        product_recipes (
-          ingredient_id,
-          qte_utilisee
-        )`
-    : '';
-
-  return `
-        id,
-        nom_produit,
-        description,
-        prix_vente,
-        categoria_id,
-        estado,
-        image${bestSellerColumns}${recipeColumns}
-      `;
-};
-
-const selectProductsQuery = (options?: SelectProductsQueryOptions) => {
-  const includeBestSellerColumns = options?.includeBestSellerColumns !== false;
-  const includeRecipes = options?.includeRecipes !== false;
-  let query = supabase
-    .from('products')
-    .select(buildProductSelectColumns(includeBestSellerColumns, includeRecipes));
-
-  if (options?.orderBy) {
-    query = query.order(options.orderBy.column, {
-      ascending: options.orderBy.ascending ?? true,
-        nullsFirst: options.orderBy.nullsFirst ?? false,
-      });
-
 };

@@ -1083,6 +1083,8 @@ export const api = {
       }),
     );
 
+    const categoryMap = new Map(categories.map(category => [category.id, category.nom]));
+
     const saleDateIso = toIsoString(todaysOrders[0]?.date_servido) ?? new Date().toISOString();
     const salesEntries = todaysOrders.flatMap(order =>
       order.items.map(item => {
@@ -1618,7 +1620,7 @@ export const api = {
     const rows = unwrap<SupabaseOrderRow[]>(response as SupabaseResponse<SupabaseOrderRow[]>);
     const orders = rows.map(mapOrderRow);
     return {
-      pending: orders.filter(order => order.statut === 'pendiente_validacion'),
+      pending: orders.filter(order => order.statut === 'pendiente_validacion' || order.statut === 'en_cours'),
       ready: orders.filter(order => order.estado_cocina === 'listo'),
     };
   },
@@ -2054,6 +2056,7 @@ export const api = {
         statut: 'en_cours',
         estado_cocina: 'recibido',
         payment_status: 'paid',
+        payment_method: 'carte_bancaire', // Assumer un paiement par carte pour les commandes en ligne validées
         date_envoi_cuisine: nowIso,
       })
       .eq('id', orderId);
@@ -2096,7 +2099,7 @@ export const api = {
     const orders = rows.map(mapOrderRow);
 
     return {
-      pendingTakeaway: orders.filter(order => order.type === 'a_emporter' && order.statut === 'pendiente_validacion').length,
+      pendingTakeaway: orders.filter(order => order.type === 'a_emporter' && (order.statut === 'pendiente_validacion' || order.statut === 'en_cours')).length,
       readyTakeaway: orders.filter(order => order.type === 'a_emporter' && order.estado_cocina === 'listo').length,
       kitchenOrders: orders.filter(order => order.estado_cocina === 'recibido').length,
       lowStockIngredients: (await fetchIngredients()).filter(

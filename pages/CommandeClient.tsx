@@ -278,17 +278,16 @@ const OrderMenuView: React.FC<OrderMenuViewProps> = ({ onOrderSubmitted }) => {
                 setProducts(productsData);
                 setCategories(categoriesData);
                 
-                // Fetch order history
-                const activeOrderId = getActiveCustomerOrder();
-                if (activeOrderId) {
-                    try {
-                        const order = await api.getOrderById(activeOrderId);
-                        if (order) {
-                            setOrderHistory([order]);
-                        }
-                    } catch (err) {
-                        console.error('Error fetching active order:', err);
+                // Fetch order history from localStorage
+                try {
+                    const historyJSON = localStorage.getItem('customer-order-history');
+                    if (historyJSON) {
+                        const history: Order[] = JSON.parse(historyJSON);
+                        // Get the last 3 orders
+                        setOrderHistory(history.slice(0, 3));
                     }
+                } catch (err) {
+                    console.error('Error fetching order history:', err);
                 }
             } catch (err) {
                 console.error('Error fetching data:', err);
@@ -325,6 +324,14 @@ const OrderMenuView: React.FC<OrderMenuViewProps> = ({ onOrderSubmitted }) => {
     const handleProductClick = (product: Product) => {
         setSelectedProduct({product});
         setModalOpen(true);
+    };
+
+    const handleReorder = (order: Order) => {
+        const itemsToAddToCart = order.items.map(item => ({
+            ...item,
+            id: `oi${Date.now()}-${Math.random()}` // Nouvel ID pour chaque article
+        }));
+        setCart(itemsToAddToCart);
     };
 
     const handleAddToCart = (item: OrderItem) => {
@@ -453,38 +460,6 @@ const OrderMenuView: React.FC<OrderMenuViewProps> = ({ onOrderSubmitted }) => {
         }
     };
 
-    const handleReorder = (pastOrder: Order) => {
-        const timestamp = Date.now();
-        const missingProducts: string[] = [];
-
-        const updatedItems = pastOrder.items.reduce<OrderItem[]>((acc, item, index) => {
-            if (isDeliveryFeeItem(item)) {
-                return acc;
-            }
-
-            const product = products.find(p => p.id === item.produitRef);
-
-            if (!product) {
-                missingProducts.push(item.nom_produit || item.produitRef);
-                return acc;
-            }
-
-            const newItem: OrderItem = {
-                ...item,
-                id: `oi-${timestamp}-${index}`,
-                prix_unitaire: product.prix_vente, // Use current product price
-            };
-            return [...acc, newItem];
-        }, []);
-
-        if (missingProducts.length > 0) {
-            alert(`Algunos productos no están disponibles: ${missingProducts.join(", ")}. Se han omitido del pedido.`);
-        }
-
-        setCart(updatedItems);
-        setOrderHistory([]); // Clear history after reordering
-    };
-
     const generateWhatsAppMessage = (order: Order): string => {
         const itemsText = order.items.map(item => `- ${item.quantite}x ${item.nom_produit} (${formatCurrencyCOP(item.prix_unitaire)})`).join("\n");
         const totalText = `Total: ${formatCurrencyCOP(order.total)}`;
@@ -501,33 +476,38 @@ const OrderMenuView: React.FC<OrderMenuViewProps> = ({ onOrderSubmitted }) => {
         <div className="flex flex-col lg:flex-row">
             {/* Main Content */}
             <div className="flex-1 p-4 lg:p-8">
-                {/* Pedido Anterior - Displayed in Hero section */}
+                {/* Tus ultimos pedidos - Displayed in Hero section */}
                 {orderHistory.length > 0 && (
-                    <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg max-w-md">
-                        <p className="text-sm font-semibold text-blue-700 mb-2">Pedido anterior:</p>
-                        {orderHistory.map(order => {
-                            const orderDate = order.created_at ? new Date(order.created_at).toLocaleDateString('es-ES', { 
-                                day: '2-digit', 
-                                month: '2-digit',
-                                year: 'numeric'
-                            }) : 'Fecha no disponible';
-                            
-                            return (
-                                <div key={order.id} className="flex justify-between items-center bg-white p-2 rounded shadow-sm">
-                                    <div className="flex-1">
-                                        <p className="text-xs text-gray-500">{orderDate}</p>
-                                        <p className="text-sm font-bold text-blue-600">{formatCurrencyCOP(order.total)}</p>
+                    <div className="mb-6 p-6 bg-gradient-to-br from-gray-800 to-gray-900 rounded-2xl shadow-2xl max-w-2xl">
+                        <h2 className="text-3xl font-bold text-white mb-6" style={{ fontFamily: "'Brush Script MT', cursive" }}>Tus ultimos pedidos</h2>
+                        <div className="space-y-4">
+                            {orderHistory.map(order => {
+                                const orderDate = order.created_at ? new Date(order.created_at).toLocaleDateString('es-ES', { 
+                                    day: '2-digit', 
+                                    month: '2-digit',
+                                    year: 'numeric'
+                                }) : 'Fecha no disponible';
+                                
+                                const itemCount = order.items ? order.items.reduce((acc, item) => acc + item.quantite, 0) : 0;
+                                
+                                return (
+                                    <div key={order.id} className="flex flex-col md:flex-row justify-between items-start md:items-center bg-gray-700/50 backdrop-blur-sm p-4 rounded-xl border border-gray-600 hover:border-yellow-500 transition-all">
+                                        <div className="flex-1 mb-3 md:mb-0">
+                                            <p className="text-xl font-bold text-white mb-1">Pedido del {orderDate}</p>
+                                            <p className="text-gray-300">
+                                                {itemCount} article{itemCount > 1 ? 's' : ''} • {formatCurrencyCOP(order.total)}
+                                            </p>
+                                        </div>
+                                        <button 
+                                            onClick={() => handleReorder(order)} 
+                                            className="w-full md:w-auto bg-gradient-to-r from-yellow-400 to-yellow-500 hover:from-yellow-500 hover:to-yellow-600 text-gray-900 font-bold px-6 py-3 rounded-xl shadow-lg hover:shadow-xl transition-all transform hover:scale-105 border-2 border-yellow-600"
+                                        >
+                                            Pedir de nuevo
+                                        </button>
                                     </div>
-                                    <button 
-                                        onClick={() => handleReorder(order)} 
-                                        className="flex items-center bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded text-sm font-medium transition-colors"
-                                    >
-                                        <History size={14} className="mr-1" /> 
-                                        Reordenar
-                                    </button>
-                                </div>
-                            );
-                        })}
+                                );
+                            })}
+                        </div>
                     </div>
                 )}
 

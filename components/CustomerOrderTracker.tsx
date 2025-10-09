@@ -195,24 +195,28 @@ const CustomerOrderTracker: React.FC<CustomerOrderTrackerProps> = ({ orderId, on
                 <div className={`${variant === 'hero' ? 'bg-black/20 p-4 rounded-lg' : 'border-t pt-6 mt-6'} space-y-4`}>
                     <h3 className={`text-xl font-bold ${variant === 'hero' ? 'text-white' : 'text-gray-800'}`}>Résumé de la commande</h3>
                     <div className="space-y-2">
-                        {order.items.map(item => {
-                            const isDomicilio = item.nom_produit === 'Domicilio';
-                            const isFreeShipping = isDomicilio && item.prix_unitaire === 0;
-                            
-                            return (
-                                <div key={item.id} className={`flex justify-between items-center ${variant === 'hero' ? 'text-gray-200' : 'text-gray-600'}`}>
-                                    <span>{item.quantite}x {item.nom_produit}</span>
-                                    {isFreeShipping ? (
-                                        <div className="flex items-center space-x-2">
-                                            <span className={`text-sm ${variant === 'hero' ? 'text-gray-400' : 'text-gray-400'} line-through`}>{formatCurrencyCOP(8000)}</span>
-                                            <span className="text-sm font-bold text-green-600">GRATIS</span>
-                                        </div>
-                                    ) : (
-                                        <span>{formatCurrencyCOP(item.prix_unitaire * item.quantite)}</span>
-                                    )}
-                                </div>
-                            );
-                        })}
+                        {order.items && order.items.length > 0 ? (
+                            order.items.map(item => {
+                                const isDomicilio = item.nom_produit === 'Domicilio';
+                                const isFreeShipping = isDomicilio && item.prix_unitaire === 0;
+                                
+                                return (
+                                    <div key={item.id} className={`flex justify-between items-center ${variant === 'hero' ? 'text-gray-200' : 'text-gray-600'}`}>
+                                        <span>{item.quantite}x {item.nom_produit}</span>
+                                        {isFreeShipping ? (
+                                            <div className="flex items-center space-x-2">
+                                                <span className={`text-sm ${variant === 'hero' ? 'text-gray-400' : 'text-gray-400'} line-through`}>{formatCurrencyCOP(8000)}</span>
+                                                <span className="text-sm font-bold text-green-600">GRATIS</span>
+                                            </div>
+                                        ) : (
+                                            <span>{formatCurrencyCOP(item.prix_unitaire * item.quantite)}</span>
+                                        )}
+                                    </div>
+                                );
+                            })
+                        ) : (
+                            <p className={`${variant === 'hero' ? 'text-gray-300' : 'text-gray-600'}`}>Aucun article enregistré pour cette commande.</p>
+                        )}
                     </div>
                     
                     {/* Affichage du subtotal, des promotions et des codes promo */}
@@ -241,35 +245,7 @@ const CustomerOrderTracker: React.FC<CustomerOrderTrackerProps> = ({ orderId, on
                         </div>
                     )}
                     
-                    {/* Affichage des promotions et réductions */}
-                    {(order.subtotal || order.total_discount || order.promo_code || order.applied_promotions) && (
-                        <div className={`border-t pt-3 mt-3 space-y-2 ${variant === 'hero' ? 'border-gray-500' : 'border-gray-300'}`}>
-                            {order.subtotal && order.subtotal !== order.total && (
-                                <div className={`flex justify-between ${variant === 'hero' ? 'text-gray-300' : 'text-gray-600'}`}>
-                                    <span>Subtotal</span>
-                                    <span>{formatCurrencyCOP(order.subtotal)}</span>
-                                </div>
-                            )}
-                            
-                            {order.applied_promotions && order.applied_promotions.length > 0 && (
-                                <div className="space-y-1">
-                                    {order.applied_promotions.map((promo, index) => (
-                                        <div key={index} className={`flex justify-between items-center ${variant === 'hero' ? 'text-green-400' : 'text-green-600'}`}>
-                                            <span className="text-sm">🎉 {promo.name}</span>
-                                            <span className="text-sm font-semibold">-{formatCurrencyCOP(promo.discount_amount)}</span>
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
-                            
-                            {order.promo_code && (
-                                <div className={`flex justify-between items-center ${variant === 'hero' ? 'text-green-400' : 'text-green-600'}`}>
-                                    <span className="text-sm">🎟️ Code promo: {order.promo_code}</span>
-                                    <span className="text-sm font-semibold">-{formatCurrencyCOP(order.total_discount || 0)}</span>
-                                </div>
-                            )}
-                        </div>
-                    )}
+
                     
                     <div className={`flex justify-between font-bold text-lg border-t pt-2 ${variant === 'hero' ? 'text-white border-gray-500' : 'text-gray-800'}`}>
                         <span>Total</span>

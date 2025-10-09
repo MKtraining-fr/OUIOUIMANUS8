@@ -481,7 +481,7 @@ const mapOrderRow = (row: SupabaseOrderRow): Order => {
   order.subtotal = toNumber(row.subtotal);
   order.total_discount = toNumber(row.total_discount);
   order.promo_code = row.promo_code ?? undefined;
-  order.applied_promotions = row.applied_promotions ?? undefined;
+  order.applied_promotions = row.applied_promotions ? (typeof row.applied_promotions === 'string' ? JSON.parse(row.applied_promotions) : row.applied_promotions) : undefined;
 
   return order;
 };
@@ -620,10 +620,14 @@ const selectOrdersQuery = () =>
           commentaire,
           estado,
           date_envoi
-        )
+        ),
+        subtotal,
+        total_discount,
+        promo_code,
+        applied_promotions
       `,
     )
-    .order('date_creation', { ascending: false });
+    .order("date_creation", { ascending: false });
 
 type SelectProductsQueryOptions = {
   orderBy?: { column: string; ascending?: boolean; nullsFirst?: boolean };
@@ -2030,28 +2034,18 @@ export const api = {
     const orderRow = unwrap<SupabaseOrderRow>(insertResponse as SupabaseResponse<SupabaseOrderRow>);
 
     if (orderData.items.length > 0) {
-      await supabase.from('order_items').insert(
-        orderData.items.map(item => {
-          const payloadItem: Record<string, unknown> = {
-            order_id: orderRow.id,
-            produit_id: item.produitRef,
-            nom_produit: item.nom_produit,
-            prix_unitaire: item.prix_unitaire,
-            quantite: item.quantite,
-            excluded_ingredients: item.excluded_ingredients,
-            commentaire: item.commentaire,
-            estado: item.estado,
-            date_envoi: item.date_envoi ? new Date(item.date_envoi).toISOString() : null,
-          };
-
-          if (isUuid(item.id)) {
-            payloadItem.id = item.id;
-          }
-
-          return payloadItem;
-        }),
-        { defaultToNull: false },
-      );
+      const itemsToInsert = orderData.items.map(item => ({
+        order_id: orderRow.id,
+        produit_id: item.produitRef,
+        nom_produit: item.nom_produit,
+        prix_unitaire: item.prix_unitaire,
+        quantite: item.quantite,
+        excluded_ingredients: item.excluded_ingredients,
+        commentaire: item.commentaire,
+        estado: item.estado,
+        date_envoi: item.date_envoi ? new Date(item.date_envoi).toISOString() : null,
+      }));
+      await supabase.from('order_items').insert(itemsToInsert);
     }
 
     publishOrderChange();

@@ -215,6 +215,32 @@ const CustomerOrderTracker: React.FC<CustomerOrderTrackerProps> = ({ orderId, on
                         })}
                     </div>
                     
+                    {/* Affichage du subtotal, des promotions et des codes promo */}
+                    {(order.subtotal !== undefined && order.subtotal !== null && order.subtotal !== order.total) && (
+                        <div className={`flex justify-between ${variant === 'hero' ? 'text-gray-300' : 'text-gray-600'}`}>
+                            <span>Subtotal</span>
+                            <span>{formatCurrencyCOP(order.subtotal)}</span>
+                        </div>
+                    )}
+
+                    {order.applied_promotions && order.applied_promotions.length > 0 && (
+                        <div className="space-y-1">
+                            {order.applied_promotions.map((promo: any, index: number) => (
+                                <div key={index} className={`flex justify-between items-center ${variant === 'hero' ? 'text-green-400' : 'text-green-600'}`}>
+                                    <span className="text-sm">🎉 {promo.name || promo.code}</span>
+                                    <span className="text-sm font-semibold">-{formatCurrencyCOP(promo.discount || 0)}</span>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+
+                    {order.promo_code && order.total_discount && order.total_discount > 0 && (
+                        <div className={`flex justify-between items-center ${variant === 'hero' ? 'text-green-400' : 'text-green-600'}`}>
+                            <span className="text-sm">🎟️ Code promo: {order.promo_code}</span>
+                            <span className="text-sm font-semibold">-{formatCurrencyCOP(order.total_discount)}</span>
+                        </div>
+                    )}
+                    
                     {/* Affichage des promotions et réductions */}
                     {(order.subtotal || order.total_discount || order.promo_code || order.applied_promotions) && (
                         <div className={`border-t pt-3 mt-3 space-y-2 ${variant === 'hero' ? 'border-gray-500' : 'border-gray-300'}`}>

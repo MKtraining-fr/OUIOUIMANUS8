@@ -25,7 +25,7 @@ const ProductCardWithPromotion: React.FC<ProductCardWithPromotionProps> = ({ pro
     >
       {/* Afficher tous les badges promotionnels si des promotions sont applicables */}
       {!loading && promotions.length > 0 && product.estado === 'disponible' && (
-        <div className="absolute top-2 right-2 flex flex-col space-y-1 z-10">
+        <div className="absolute top-2 right-2 flex flex-wrap gap-1 max-w-[calc(100%-1rem)] justify-end z-10">
           {promotions.map((promotion, index) => (
             <PromotionBadge key={promotion.id || index} promotion={promotion} />
           ))}

@@ -32,7 +32,8 @@ const PromotionBadge: React.FC<PromotionBadgeProps> = ({ promotion, className = 
       badgeText = 'ENVÍO GRATIS';
       badgeDescription = badgeDescription || 'Envío gratis en este producto';
     } else {
-      badgeText = 'PROMO';
+      // Use promotion name as badge text if no specific type is recognized
+      badgeText = promotion.name || 'PROMO';
       badgeDescription = badgeDescription || promotion.name;
     }
   }
@@ -40,48 +41,24 @@ const PromotionBadge: React.FC<PromotionBadgeProps> = ({ promotion, className = 
   // Couleurs par défaut
   const textColor = visuals.badge_color || '#FFFFFF';
   const bgColor = visuals.badge_bg_color || '#E63946';
-  const position = visuals.badge_position || 'top-right';
-  
-  // Classes de positionnement
-  const positionClasses = {
-    'top-left': 'top-2 left-2',
-    'top-right': 'top-2 right-2',
-    'bottom-left': 'bottom-2 left-2',
-    'bottom-right': 'bottom-2 right-2'
-  };
   
   // Vérifier s'il y a une image de fond
   const backgroundImage = visuals.badge_bg_image;
   
   return (
     <div
-      className={`absolute ${positionClasses[position]} z-10 px-3 py-1 rounded-full font-bold text-sm shadow-lg transform rotate-3 ${className}`}
+      className={`px-2 py-0.5 rounded-full font-bold text-xs shadow-md ${className}`}
       style={{
         backgroundColor: backgroundImage ? 'transparent' : bgColor,
         backgroundImage: backgroundImage ? `url(${backgroundImage})` : 'none',
         backgroundSize: 'cover',
         backgroundPosition: 'center',
         color: textColor,
-        animation: 'pulse 2s infinite',
         textShadow: backgroundImage ? '0 1px 3px rgba(0,0,0,0.8)' : 'none'
       }}
       title={badgeDescription}
     >
       {badgeText}
-      
-      <style jsx>{`
-        @keyframes pulse {
-          0% {
-            transform: rotate(3deg) scale(1);
-          }
-          50% {
-            transform: rotate(3deg) scale(1.05);
-          }
-          100% {
-            transform: rotate(3deg) scale(1);
-          }
-        }
-      `}</style>
     </div>
   );
 };

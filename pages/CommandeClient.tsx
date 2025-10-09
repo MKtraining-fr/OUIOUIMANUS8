@@ -413,13 +413,24 @@ const OrderMenuView: React.FC<OrderMenuViewProps> = ({ onOrderSubmitted }) => {
                 ? [...cart, createDeliveryFeeItem(isFreeShipping)] 
                 : cart;
 
+            // Calculer le subtotal (total avant réductions et frais de livraison)
+            const subtotal = cart.reduce((sum, item) => sum + item.prix_unitaire * item.quantite, 0);
+            
+            // Calculer le total avec frais de livraison et réductions
+            const deliveryFee = orderType === 'pedir_en_linea' && !isFreeShipping ? DOMICILIO_FEE : 0;
+            const totalWithDelivery = subtotal + deliveryFee;
+            const finalTotal = Math.max(0, totalWithDelivery - promoCodeDiscount);
+
             const orderData = {
                 type: orderType,
                 items: itemsToSubmit,
                 clientInfo,
                 receipt_url: receiptUrl,
                 payment_method: paymentMethod,
-                promo_code: appliedPromoCode,
+                promo_code: appliedPromoCode || undefined,
+                subtotal: subtotal,
+                total_discount: promoCodeDiscount,
+                applied_promotions: appliedPromoCode ? [{ code: appliedPromoCode, discount: promoCodeDiscount }] : undefined,
             };
             const newOrder = await api.submitCustomerOrder(orderData);
             setSubmittedOrder(newOrder);

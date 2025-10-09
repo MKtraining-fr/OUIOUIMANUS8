@@ -213,8 +213,8 @@ const CustomerOrderTracker: React.FC<CustomerOrderTrackerProps> = ({ orderId, on
                     
                     .stamp-container {
                         position: relative;
-                        width: 140px;
-                        height: 140px;
+                        width: 180px;
+                        height: 180px;
                         animation: stamp-appear 0.5s ease-out;
                     }
                     
@@ -284,12 +284,12 @@ const CustomerOrderTracker: React.FC<CustomerOrderTrackerProps> = ({ orderId, on
                     }
                     
                     .stamp-text:first-child {
-                        font-size: 16px;
-                        margin-bottom: 4px;
+                        font-size: 20px;
+                        margin-bottom: 6px;
                     }
                     
                     .stamp-text-large {
-                        font-size: 32px;
+                        font-size: 42px;
                         font-weight: 900;
                     }
                     

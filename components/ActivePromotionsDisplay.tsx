@@ -43,11 +43,11 @@ const ActivePromotionsDisplay: React.FC = () => {
 
   const getPromotionIcon = (promo: Promotion) => {
     const config = promo.config as any;
-    if (config.applies_to === 'shipping') return <TruckIcon size={20} />;
-    if (config.discount_type === 'percentage') return <Percent size={20} />;
-    if (config.hours_of_day) return <Clock size={20} />;
-    if (config.buy_quantity) return <Gift size={20} />;
-    return <Tag size={20} />;
+    if (config.applies_to === 'shipping') return <TruckIcon size={16} />;
+    if (config.discount_type === 'percentage') return <Percent size={16} />;
+    if (config.hours_of_day) return <Clock size={16} />;
+    if (config.buy_quantity) return <Gift size={16} />;
+    return <Tag size={16} />;
   };
 
   const getPromotionDescription = (promo: Promotion) => {
@@ -74,12 +74,12 @@ const ActivePromotionsDisplay: React.FC = () => {
   };
 
   return (
-    <div className="mb-6 space-y-3">
-      <h3 className="text-lg font-bold text-gray-800 flex items-center">
-        <Gift className="mr-2" size={24} />
+    <div className="mb-4 space-y-2">
+      <h3 className="text-lg font-bold text-gray-900 flex items-center drop-shadow-md">
+        <Gift className="mr-2" size={22} />
         Promociones Activas
       </h3>
-      <div className="space-y-2">
+      <div className="space-y-1.5">
         {visiblePromotions.map((promo) => {
           const config = promo.config as any;
           const bgColor = config.visuals?.badge_bg_color || '#4CAF50';
@@ -87,21 +87,21 @@ const ActivePromotionsDisplay: React.FC = () => {
           return (
             <div
               key={promo.id}
-              className="flex items-start p-4 rounded-lg shadow-md border-l-4 transition-transform hover:scale-[1.02]"
+              className="flex items-start p-2 rounded-lg shadow-sm border-l-4 transition-transform hover:scale-[1.01]"
               style={{
                 borderLeftColor: bgColor,
                 background: `linear-gradient(to right, ${bgColor}15, white)`,
               }}
             >
               <div
-                className="flex items-center justify-center w-10 h-10 rounded-full mr-3 flex-shrink-0"
+                className="flex items-center justify-center w-8 h-8 rounded-full mr-2 flex-shrink-0"
                 style={{ backgroundColor: bgColor, color: config.visuals?.badge_color || '#FFFFFF' }}
               >
                 {getPromotionIcon(promo)}
               </div>
               <div className="flex-1">
-                <p className="font-bold text-gray-800">{promo.name}</p>
-                <p className="text-sm text-gray-600">{getPromotionDescription(promo)}</p>
+                <p className="font-bold text-gray-900 text-sm">{promo.name}</p>
+                <p className="text-xs text-gray-600">{getPromotionDescription(promo)}</p>
               </div>
             </div>
           );

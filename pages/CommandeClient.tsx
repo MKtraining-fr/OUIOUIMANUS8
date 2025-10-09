@@ -481,7 +481,7 @@ const OrderMenuView: React.FC<OrderMenuViewProps> = ({ onOrderSubmitted }) => {
             <div className="flex-1 p-4 lg:p-8">
 
 
-                <h1 className="text-3xl font-bold text-gray-800 mb-6">Realizar Pedido</h1>
+                <h1 className="text-3xl font-bold text-gray-900 mb-6 drop-shadow-md">Realizar Pedido</h1>
 
                 {/* Active Promotions Display */}
                 <ActivePromotionsDisplay />

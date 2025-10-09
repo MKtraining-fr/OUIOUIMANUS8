@@ -577,14 +577,15 @@ const mapTableRowWithMeta = async (row: SupabaseTableRow): Promise<Table> => {
     : new Map();
 
   return mapTableRow(row, orderMeta);
+};
+
 const selectOrdersQuery = () => supabase.from("orders").select(`
-        *,
-        order_items(*),
-        subtotal,
-        total_discount,
-        promo_code,
-        applied_promotions
-      `);
+        id,
+        type,
+        table_id,
+        table_nom,
+        couverts,
+        statut,
         estado_cocina,
         date_creation,
         date_envoi_cuisine,
@@ -599,19 +600,24 @@ const selectOrdersQuery = () => supabase.from("orders").select(`
         client_telephone,
         client_adresse,
         receipt_url,
+        subtotal,
+        total_discount,
+        promo_code,
+        applied_promotions,
         order_items (
           id,
-          order_id
+          order_id,
+          produit_id,
+          nom_produit,
+          prix_unitaire,
+          quantite,
+          excluded_ingredients,
+          commentaire,
+          estado,
+          date_envoi
+        )
+      `);
 
-
-
-    });
-  } else {
-    query = query.order('nom_produit');
-  }
-
-  return query;
-};
 
 const isMissingBestSellerColumnError = (error: { message?: string } | null): boolean => {
   if (!error?.message) {
@@ -2397,11 +2403,8 @@ const selectProductsQuery = (options?: SelectProductsQueryOptions) => {
   if (options?.orderBy) {
     query = query.order(options.orderBy.column, {
       ascending: options.orderBy.ascending ?? true,
-      nullsFirst: options.orderBy.nullsFirst,
-    });
-  } else {
-    query = query.order('nom_produit');
-  }
-
-  return query;
-};
+      nullsFirst: options.orderBy.nullsFi        order_items (
+          id,
+          order_id
+        )
+      `

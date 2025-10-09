@@ -210,9 +210,123 @@ const CustomerOrderTracker: React.FC<CustomerOrderTrackerProps> = ({ orderId, on
                         50% { opacity: 1; }
                         100% { transform: translateX(200%); opacity: 0.8; }
                     }
+                    
+                    .stamp-container {
+                        position: relative;
+                        width: 140px;
+                        height: 140px;
+                        animation: stamp-appear 0.5s ease-out;
+                    }
+                    
+                    @keyframes stamp-appear {
+                        0% {
+                            transform: scale(0) rotate(-45deg);
+                            opacity: 0;
+                        }
+                        60% {
+                            transform: scale(1.1) rotate(0deg);
+                        }
+                        100% {
+                            transform: scale(1) rotate(0deg);
+                            opacity: 1;
+                        }
+                    }
+                    
+                    .stamp-border {
+                        width: 100%;
+                        height: 100%;
+                        border: 4px solid #dc2626;
+                        border-radius: 50%;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        background: rgba(220, 38, 38, 0.05);
+                        position: relative;
+                        box-shadow: 0 0 0 2px #dc2626;
+                    }
+                    
+                    .stamp-border::before {
+                        content: '';
+                        position: absolute;
+                        top: 0;
+                        left: 0;
+                        right: 0;
+                        bottom: 0;
+                        border-radius: 50%;
+                        background: repeating-linear-gradient(
+                            45deg,
+                            transparent,
+                            transparent 2px,
+                            rgba(220, 38, 38, 0.03) 2px,
+                            rgba(220, 38, 38, 0.03) 4px
+                        );
+                    }
+                    
+                    .stamp-inner {
+                        display: flex;
+                        flex-direction: column;
+                        align-items: center;
+                        justify-content: center;
+                        text-align: center;
+                        z-index: 1;
+                    }
+                    
+                    .stamp-text {
+                        font-family: 'Arial Black', 'Arial Bold', sans-serif;
+                        font-weight: 900;
+                        color: #dc2626;
+                        text-transform: uppercase;
+                        letter-spacing: 2px;
+                        line-height: 1;
+                        text-shadow: 
+                            1px 1px 0 rgba(220, 38, 38, 0.3),
+                            -1px -1px 0 rgba(220, 38, 38, 0.3);
+                    }
+                    
+                    .stamp-text:first-child {
+                        font-size: 16px;
+                        margin-bottom: 4px;
+                    }
+                    
+                    .stamp-text-large {
+                        font-size: 32px;
+                        font-weight: 900;
+                    }
+                    
+                    /* Effet de texture grunge */
+                    .stamp-border::after {
+                        content: '';
+                        position: absolute;
+                        top: 0;
+                        left: 0;
+                        right: 0;
+                        bottom: 0;
+                        border-radius: 50%;
+                        background-image: 
+                            radial-gradient(circle at 20% 30%, transparent 0%, transparent 2%, rgba(220, 38, 38, 0.1) 2%, transparent 3%),
+                            radial-gradient(circle at 80% 70%, transparent 0%, transparent 2%, rgba(220, 38, 38, 0.1) 2%, transparent 3%),
+                            radial-gradient(circle at 40% 80%, transparent 0%, transparent 1%, rgba(220, 38, 38, 0.1) 1%, transparent 2%),
+                            radial-gradient(circle at 60% 20%, transparent 0%, transparent 1%, rgba(220, 38, 38, 0.1) 1%, transparent 2%);
+                        opacity: 0.8;
+                    }
                 `}</style>
                 
-                <div className={`${variant === 'hero' ? 'bg-black/20 p-4 rounded-lg' : 'border-t pt-6 mt-6'} space-y-4`}>
+                <div className={`${variant === 'hero' ? 'bg-black/20 p-4 rounded-lg' : 'border-t pt-6 mt-6'} space-y-4 relative`}>
+                    {/* Tampon PEDIDO LISTO */}
+                    {isOrderCompleted && (
+                        <div className="absolute top-4 right-4 z-10 pointer-events-none">
+                            <div className="relative" style={{ transform: 'rotate(15deg)' }}>
+                                <div className="stamp-container">
+                                    <div className="stamp-border">
+                                        <div className="stamp-inner">
+                                            <span className="stamp-text">PEDIDO</span>
+                                            <span className="stamp-text stamp-text-large">LISTO</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
                     <h3 className={`text-xl font-bold ${variant === 'hero' ? 'text-white' : 'text-gray-800'}`}>Résumé de la commande</h3>
                     <div className="space-y-2">
                         {order.items && order.items.length > 0 ? (

@@ -251,9 +251,12 @@ const CustomerOrderTracker: React.FC<CustomerOrderTrackerProps> = ({ orderId, on
                     </div>
 
                     <div className={`border-t pt-4 space-y-2 ${variant === 'hero' ? 'border-gray-500' : ''}`}>
+                        <h3 className={`text-xl font-bold ${variant === 'hero' ? 'text-white' : 'text-gray-800'} mb-2`}>Informations Client</h3>
                         <div className={`flex items-center ${variant === 'hero' ? 'text-gray-200' : 'text-gray-700'}`}><User size={16} className="mr-2"/>{order.clientInfo?.nom}</div>
                         <div className={`flex items-center ${variant === 'hero' ? 'text-gray-200' : 'text-gray-700'}`}><Phone size={16} className="mr-2"/>{order.clientInfo?.telephone}</div>
-                        <div className={`flex items-center ${variant === 'hero' ? 'text-gray-200' : 'text-gray-700'}`}><MapPin size={16} className="mr-2"/>{order.clientInfo?.adresse}</div>
+                        {order.clientInfo?.adresse && (
+                            <div className={`flex items-center ${variant === 'hero' ? 'text-gray-200' : 'text-gray-700'}`}><MapPin size={16} className="mr-2"/>{order.clientInfo?.adresse}</div>
+                        )}
                         {order.receipt_url && (
                             <button onClick={() => setReceiptModalOpen(true)} className="flex items-center text-blue-400 hover:underline"><Receipt size={16} className="mr-2"/>Voir le justificatif</button>
                         )}

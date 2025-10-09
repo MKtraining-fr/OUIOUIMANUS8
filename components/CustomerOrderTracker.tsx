@@ -163,34 +163,54 @@ const CustomerOrderTracker: React.FC<CustomerOrderTrackerProps> = ({ orderId, on
                 <h2 className={`text-3xl font-bold text-center mb-2 ${variant === 'hero' ? 'text-white' : 'text-gray-800'}`}>Suivi de votre commande</h2>
                 <p className={`text-center font-semibold mb-8 ${variant === 'hero' ? 'text-gray-300' : 'text-gray-500'}`}>Commande #{order.id.slice(-6)}</p>
 
-                <div className="flex justify-between items-start mb-10 px-2">
+                <div className="flex items-center mb-10 px-2">
                     {steps.map((step, index) => {
                         const isActive = index === currentStep;
                         const isFinalStep = index === steps.length - 1;
                         const isCompleted = index < currentStep || (isFinalStep && isOrderCompleted);
-                        const baseCircleClasses = "w-16 h-16 rounded-full flex items-center justify-center border-4 transition-all duration-300";
-                        const circleClasses = [
-                            baseCircleClasses,
-                            isCompleted ? 'bg-green-500 border-green-500 text-white' : '',
-                            !isCompleted && isActive && index === 0 ? 'waiting-status-indicator' : '',
-                            !isCompleted && isActive && index !== 0 ? 'bg-brand-primary border-brand-primary text-brand-secondary animate-pulse' : '',
-                            !isCompleted && !isActive ? 'bg-gray-200 border-gray-300 text-gray-500' : '',
-                        ].filter(Boolean).join(' ');
+                        
                         return (
                             <React.Fragment key={step.name}>
-                                <div className="flex flex-col items-center text-center w-24">
-                                    <div className={circleClasses}>
-                                        <step.icon size={32} />
+                                <div className="flex flex-col items-center">
+                                    <div className={`flex items-center justify-center w-12 h-12 sm:w-16 sm:h-16 rounded-full border-4 transition-all duration-500 ${
+                                        isCompleted ? 'bg-green-500 border-green-300' :
+                                        isActive ? 'bg-blue-600 border-blue-400 animate-pulse' :
+                                        'bg-gray-400 border-gray-300'
+                                    }`}>
+                                        <step.icon className={`w-6 h-6 sm:w-8 sm:h-8 ${variant === 'hero' ? 'text-white' : 'text-white'}`} />
                                     </div>
-                                    <p className={`mt-2 text-sm md:text-base font-semibold break-words ${isActive ? `font-bold ${variant === 'hero' ? 'text-brand-primary' : 'text-brand-primary'}` : `${variant === 'hero' ? 'text-gray-300' : 'text-gray-600'}`}`}>{step.name}</p>
+                                    <p className={`mt-2 text-xs sm:text-sm font-semibold text-center ${
+                                        isCompleted || isActive ? `${variant === 'hero' ? 'text-white' : 'text-gray-800'}` : `${variant === 'hero' ? 'text-gray-400' : 'text-gray-400'}`
+                                    }`}>{step.name}</p>
                                 </div>
                                 {index < steps.length - 1 && (
-                                    <div className={`flex-1 h-2 mt-8 transition-colors duration-500 ${isCompleted ? 'bg-green-500' : 'bg-gray-300'}`}></div>
+                                    <div className={`flex-1 h-1.5 ${variant === 'hero' ? 'bg-gray-600' : 'bg-gray-300'} rounded-full mx-2 sm:mx-4 relative overflow-hidden`}>
+                                        <div
+                                            className="absolute top-0 left-0 h-full bg-green-500 transition-all duration-1000"
+                                            style={{ width: isCompleted ? '100%' : '0%' }}
+                                        ></div>
+                                        {isActive && (
+                                            <div
+                                                className="absolute top-0 left-0 h-full bg-blue-500"
+                                                style={{ 
+                                                    width: '50%',
+                                                    animation: 'progress-bar-pulse 2s ease-in-out infinite'
+                                                }}
+                                            ></div>
+                                        )}
+                                    </div>
                                 )}
                             </React.Fragment>
                         );
                     })}
                 </div>
+                <style>{`
+                    @keyframes progress-bar-pulse {
+                        0% { transform: translateX(-100%); opacity: 0.8; }
+                        50% { opacity: 1; }
+                        100% { transform: translateX(200%); opacity: 0.8; }
+                    }
+                `}</style>
                 
                 <div className={`${variant === 'hero' ? 'bg-black/20 p-4 rounded-lg' : 'border-t pt-6 mt-6'} space-y-4`}>
                     <h3 className={`text-xl font-bold ${variant === 'hero' ? 'text-white' : 'text-gray-800'}`}>Résumé de la commande</h3>

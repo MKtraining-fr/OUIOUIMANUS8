@@ -604,18 +604,7 @@ const selectOrdersQuery = () => supabase.from("orders").select(`
         total_discount,
         promo_code,
         applied_promotions,
-        order_items (
-          id,
-          order_id,
-          produit_id,
-          nom_produit,
-          prix_unitaire,
-          quantite,
-          excluded_ingredients,
-          commentaire,
-          estado,
-          date_envoi
-        )
+        order_items (id, produit_id, nom_produit, prix_unitaire, quantite, excluded_ingredients, commentaire, estado, date_envoi)
       `);
 
 

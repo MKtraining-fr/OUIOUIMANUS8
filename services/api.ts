@@ -2034,18 +2034,27 @@ export const api = {
     const orderRow = unwrap<SupabaseOrderRow>(insertResponse as SupabaseResponse<SupabaseOrderRow>);
 
     if (orderData.items.length > 0) {
-      const itemsToInsert = orderData.items.map(item => ({
-        order_id: orderRow.id,
-        produit_id: item.produitRef,
-        nom_produit: item.nom_produit,
-        prix_unitaire: item.prix_unitaire,
-        quantite: item.quantite,
-        excluded_ingredients: item.excluded_ingredients,
-        commentaire: item.commentaire,
-        estado: item.estado,
-        date_envoi: item.date_envoi ? new Date(item.date_envoi).toISOString() : null,
-      }));
-      await supabase.from('order_items').insert(itemsToInsert);
+      const itemsToInsert = orderData.items.map(item => {
+        // Vérifier si produitRef est un UUID valide, sinon mettre null
+        const isValidUUID = item.produitRef && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(item.produitRef);
+        
+        return {
+          order_id: orderRow.id,
+          produit_id: isValidUUID ? item.produitRef : null,
+          nom_produit: item.nom_produit,
+          prix_unitaire: item.prix_unitaire,
+          quantite: item.quantite,
+          excluded_ingredients: item.excluded_ingredients,
+          commentaire: item.commentaire,
+          estado: item.estado,
+          date_envoi: item.date_envoi ? new Date(item.date_envoi).toISOString() : null,
+        };
+      });
+      const insertResult = await supabase.from('order_items').insert(itemsToInsert);
+      if (insertResult.error) {
+        console.error('Error inserting order items:', insertResult.error);
+        throw new Error(`Failed to insert order items: ${insertResult.error.message}`);
+      }
     }
 
     publishOrderChange();

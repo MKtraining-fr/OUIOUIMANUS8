@@ -602,7 +602,7 @@ const selectOrdersQuery = () => supabase.from("orders").select(`
         order_items (
           id,
           order_id,
-     const buildProductSelectColumns = (includeBestSellerColumns: boolean, includeRecipes: boolean): string => {
+const buildProductSelectColumns = (includeBestSellerColumns: boolean, includeRecipes: boolean): string => {
   const bestSellerColumns = includeBestSellerColumns
     ? `,
         is_best_seller,

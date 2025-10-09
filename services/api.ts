@@ -2369,8 +2369,5 @@ const selectProductsQuery = (options?: SelectProductsQueryOptions) => {
   if (options?.orderBy) {
     query = query.order(options.orderBy.column, {
       ascending: options.orderBy.ascending ?? true,
-      nullsFirst: options.orderBy.nullsFi        order_items (
-          id,
-          order_id
-        )
-      `
+        nullsFirst: options.orderBy.nullsFirst ?? false,
+      });

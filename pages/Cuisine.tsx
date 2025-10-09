@@ -60,7 +60,7 @@ const KitchenTicketCard: React.FC<{ order: KitchenTicketOrder; onReady: (orderId
         <div className={`flex h-full flex-col overflow-hidden rounded-xl text-gray-900 shadow-lg transition-shadow duration-300 hover:shadow-xl ${urgencyStyles.border} ${urgencyStyles.background}`}>
             <header className="border-b border-gray-200 px-5 pt-5 pb-4">
                 <div className="flex w-full flex-col gap-4">
-                    <h3 className="w-full text-center text-3xl font-semibold text-gray-900 sm:text-left sm:text-4xl">
+                    <h3 className="w-full text-center text-2xl font-semibold text-gray-900 sm:text-left sm:text-3xl">
                         {order.table_nom || `Para llevar #${order.id.slice(-4)}`}
                     </h3>
                     <OrderTimer
@@ -74,7 +74,7 @@ const KitchenTicketCard: React.FC<{ order: KitchenTicketOrder; onReady: (orderId
                     {groupedItems.map((item) => (
                         <li key={item.key} className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 shadow-sm">
                             <div className="flex items-center gap-3">
-                                <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-base font-bold text-white shadow-md ${urgencyStyles.accent}`}>
+                                <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-sm font-bold text-white shadow-md ${urgencyStyles.accent}`}>
                                     {item.quantite}
                                 </span>
                                 <p className="text-lg font-semibold text-gray-900">{item.nom_produit}</p>

@@ -1996,8 +1996,12 @@ export const api = {
 
   submitCustomerOrder: async (orderData: {
     items: OrderItem[];
-    clientInfo: Order['clientInfo'];
+    clientInfo?: { nom: string; telephone: string; adresse?: string };
     receipt_url?: string;
+    subtotal?: number;
+    total_discount?: number;
+    promo_code?: string;
+    applied_promotions?: any;
   }): Promise<Order> => {
     const now = new Date();
     const nowIso = now.toISOString();
@@ -2016,8 +2020,12 @@ export const api = {
         client_telephone: orderData.clientInfo?.telephone ?? null,
         client_adresse: orderData.clientInfo?.adresse ?? null,
         receipt_url: orderData.receipt_url ?? null,
+        subtotal: orderData.subtotal ?? null,
+        total_discount: orderData.total_discount ?? null,
+        promo_code: orderData.promo_code ?? null,
+        applied_promotions: orderData.applied_promotions ?? null,
       })
-      .select('*')
+      .select("*")
       .single();
     const orderRow = unwrap<SupabaseOrderRow>(insertResponse as SupabaseResponse<SupabaseOrderRow>);
 

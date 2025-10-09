@@ -1982,7 +1982,9 @@ export const api = {
       })
       .eq('id', orderId);
 
-    if (order.table_id) {
+    // Vérifier si table_id est un UUID valide avant de mettre à jour restaurant_tables
+    const isValidTableId = order.table_id && typeof order.table_id === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(order.table_id);
+    if (isValidTableId) {
       await supabase
         .from('restaurant_tables')
         .update({ statut: 'libre', commande_id: null, couverts: null })

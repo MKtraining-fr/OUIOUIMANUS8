@@ -227,17 +227,6 @@ const CustomerOrderTracker: React.FC<CustomerOrderTrackerProps> = ({ orderId, on
                         </div>
                     )}
 
-                    {order.applied_promotions && order.applied_promotions.length > 0 && (
-                        <div className="space-y-1">
-                            {order.applied_promotions.map((promo: any, index: number) => (
-                                <div key={index} className={`flex justify-between items-center ${variant === 'hero' ? 'text-green-400' : 'text-green-600'}`}>
-                                    <span className="text-sm">🎉 {promo.name || promo.code}</span>
-                                    <span className="text-sm font-semibold">-{formatCurrencyCOP(promo.discount || 0)}</span>
-                                </div>
-                            ))}
-                        </div>
-                    )}
-
                     {order.promo_code && order.total_discount && order.total_discount > 0 && (
                         <div className={`flex justify-between items-center ${variant === 'hero' ? 'text-green-400' : 'text-green-600'}`}>
                             <span className="text-sm">🎟️ Code promo: {order.promo_code}</span>

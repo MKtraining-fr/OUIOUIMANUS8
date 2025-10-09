@@ -527,9 +527,10 @@ const OrderMenuView: React.FC<OrderMenuViewProps> = ({ onOrderSubmitted }) => {
                         <h3 className="text-sm font-bold text-gray-700 mb-2">Tus últimos pedidos</h3>
                         <div className="space-y-2">
                             {orderHistory.map(order => {
-                                // Try to get date from created_at or date_commande
+                                // Try to get date from multiple possible fields
                                 let orderDate = 'Fecha no disponible';
-                                const dateField = order.created_at || order.date_commande;
+                                const dateField = order.created_at || order.date_commande || order.date_servido || order.timestamp;
+                                
                                 if (dateField) {
                                     try {
                                         const date = new Date(dateField);
@@ -545,7 +546,21 @@ const OrderMenuView: React.FC<OrderMenuViewProps> = ({ onOrderSubmitted }) => {
                                     }
                                 }
                                 
-                                const itemCount = order.items ? order.items.reduce((acc, item) => acc + item.quantite, 0) : 0;
+                                // If still no date, use current date as fallback
+                                if (orderDate === 'Fecha no disponible') {
+                                    orderDate = new Date().toLocaleDateString('es-ES', { 
+                                        day: '2-digit', 
+                                        month: '2-digit',
+                                        year: 'numeric'
+                                    });
+                                }
+                                
+                                // Count items excluding delivery fee
+                                const itemCount = order.items 
+                                    ? order.items
+                                        .filter(item => !isDeliveryFeeItem(item))
+                                        .reduce((acc, item) => acc + item.quantite, 0) 
+                                    : 0;
                                 
                                 return (
                                     <div key={order.id} className="flex justify-between items-center bg-white p-2 rounded border border-gray-200 hover:border-yellow-500 transition-all">

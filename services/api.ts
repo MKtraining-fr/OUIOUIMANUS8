@@ -119,6 +119,11 @@ type SupabaseOrderRow = {
   client_adresse: string | null;
   receipt_url: string | null;
   order_items: SupabaseOrderItemRow[] | null;
+  promotions: any | null; // This column seems to be unused, but present in DB
+  subtotal: number | null;
+  total_discount: number | null;
+  promo_code: string | null;
+  applied_promotions: any | null;
 };
 
 type SupabaseSaleRow = {
@@ -472,6 +477,11 @@ const mapOrderRow = (row: SupabaseOrderRow): Order => {
       adresse: row.client_adresse ?? undefined,
     };
   }
+
+  order.subtotal = toNumber(row.subtotal);
+  order.total_discount = toNumber(row.total_discount);
+  order.promo_code = row.promo_code ?? undefined;
+  order.applied_promotions = row.applied_promotions ?? undefined;
 
   return order;
 };

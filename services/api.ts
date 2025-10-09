@@ -581,30 +581,7 @@ const mapTableRowWithMeta = async (row: SupabaseTableRow): Promise<Table> => {
 
 const selectOrdersQuery = () => supabase.from("orders").select(`
         id,
-        type,
-        table_id,
-        table_nom,
-        couverts,
-        statut,
-        estado_cocina,
-        date_creation,
-        date_envoi_cuisine,
-        date_listo_cuisine,
-        date_servido,
-        payment_status,
-        total,
-        profit,
-        payment_method,
-        payment_receipt_url,
-        client_nom,
-        client_telephone,
-        client_adresse,
-        receipt_url,
-        subtotal,
-        total_discount,
-        promo_code,
-        applied_promotions,
-        order_items (id, produit_id, nom_produit, prix_unitaire, quantite, excluded_ingredients, commentaire, estado, date_envoi)
+        statut
       `);
 
 

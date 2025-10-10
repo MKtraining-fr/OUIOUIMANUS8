@@ -316,7 +316,7 @@ const OrderMenuView: React.FC<OrderMenuViewProps> = ({ onOrderSubmitted }) => {
 
     useEffect(() => {
         const calculateOrderTotals = async () => {
-            const currentSubtotal = cart.reduce((acc, item) => acc + item.quantite * item.prix_unitaire, 0);
+            const initialSubtotal = cart.reduce((acc, item) => acc + item.quantite * item.prix_unitaire, 0);
 
             if (cart.length === 0) {
                 setOrderTotals({
@@ -334,8 +334,8 @@ const OrderMenuView: React.FC<OrderMenuViewProps> = ({ onOrderSubmitted }) => {
             const tempOrder: Order = {
                 id: 'temp',
                 items: cart,
-                subtotal: currentSubtotal,
-                total: currentSubtotal,
+                subtotal: initialSubtotal,
+                total: initialSubtotal,
                 total_discount: 0,
                 applied_promotions: [],
                 promo_code: appliedPromoCode || undefined,
@@ -353,17 +353,32 @@ const OrderMenuView: React.FC<OrderMenuViewProps> = ({ onOrderSubmitted }) => {
             const currentPromoCodeDiscount = updatedOrder.applied_promotions.find(p => p.config?.promo_code === appliedPromoCode)?.discount_amount || 0;
             const currentAutomaticPromotionsDiscount = totalDiscount - currentPromoCodeDiscount;
 
-            // Calculer le sous-total après TOUTES les promotions (automatiques + code promo)
-            const subtotalAfterAllPromotions = currentSubtotal - totalDiscount;
-            const qualifiesForFreeShipping = subtotalAfterAllPromotions >= freeShippingMinAmount;
-            setIsFreeShipping(qualifiesForFreeShipping);
-            const currentDeliveryFee = (orderType === 'pedir_en_linea' && !qualifiesForFreeShipping) ? DOMICILIO_FEE : 0;
+            let deliveryFee = 0;
+            let isDeliveryFree = false;
+
+            // Apply DOMICILIO GRATIS logic after all other promotions
+            if (orderType === 'pedir_en_linea') {
+                // Check for 'DOMICILIO GRATIS' promotion
+                const freeDeliveryPromo = updatedOrder.applied_promotions.find(p => p.name === 'DOMICILIO GRATIS');
+                if (freeDeliveryPromo) {
+                    isDeliveryFree = true;
+                    deliveryFee = 0;
+                } else {
+                    deliveryFee = DOMICILIO_FEE;
+                }
+            }
+
+            const finalTotal = updatedOrder.subtotal + deliveryFee;
 
             setOrderTotals({
-                subtotal: currentSubtotal,
-                total: Math.max(0, currentSubtotal - totalDiscount + currentDeliveryFee),
+                subtotal: updatedOrder.subtotal,
+                total: finalTotal,
                 automaticPromotionsDiscount: currentAutomaticPromotionsDiscount,
                 promoCodeDiscount: currentPromoCodeDiscount,
+                deliveryFee: deliveryFee,
+                appliedPromotions: updatedOrder.applied_promotions
+            });
+            setIsFreeShipping(isDeliveryFree);
                 deliveryFee: currentDeliveryFee,
                 appliedPromotions: updatedOrder.applied_promotions
             });
@@ -497,12 +512,34 @@ const OrderMenuView: React.FC<OrderMenuViewProps> = ({ onOrderSubmitted }) => {
                 promo_code: appliedPromoCode || undefined,
                 subtotal: subtotal,
                 total_discount: promoCodeDiscount,
-                applied_promotions: appliedPromoCode ? [{ code: appliedPromoCode, discount: promoCodeDiscount }] : undefined,
+                total: finalTotal,
+                applied_promotions: appliedPromoCode ? [{ 
+                    promotion_id: appliedPromoCode, 
+                    name: appliedPromoCode, 
+                    discount_amount: promoCodeDiscount 
+                }] : []
             };
-            const newOrder = await api.submitCustomerOrder(orderData);
+
+            // Soumettre la commande
+            const newOrder = await api.createOrder(orderData);
             setSubmittedOrder(newOrder);
             setConfirmOpen(true);
+
+            // Réinitialiser le panier et tous les états après soumission réussie
             setCart([]);
+            setPromoCode("");
+            setAppliedPromoCode("");
+            setPromoCodeError("");
+            setPromoCodeDiscount(0);
+            setIsFreeShipping(false);
+            setOrderTotals({
+                subtotal: 0,
+                total: 0,
+                automaticPromotionsDiscount: 0,
+                promoCodeDiscount: 0,
+                deliveryFee: 0,
+                appliedPromotions: []
+            });
             setClientInfo({nom: '', adresse: '', telephone: ''});
             setPaymentProof(null);
             setPaymentMethod('transferencia');

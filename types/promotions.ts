@@ -1,165 +1,171 @@
-// Types pour le système de promotions - Adaptés à la structure Supabase existante
+/**
+ * Types pour le système de promotions
+ * Ces types correspondent au schéma de la base de données (promotions_v1.sql)
+ */
 
-// Types de promotions disponibles
-export type PromotionType = 
-  | 'percentage' // Réduction en pourcentage
-  | 'fixed_amount' // Réduction d'un montant fixe
-  | 'promo_code' // Code promotionnel
-  | 'buy_x_get_y' // Achetez X, obtenez Y (ex: 2x1)
-  | 'free_product' // Produit gratuit
-  | 'free_shipping' // Livraison gratuite
-  | 'combo' // Combo/Menu à prix spécial
-  | 'threshold' // Réduction par palier (ex: -5% à partir de 30k, -10% à partir de 50k)
-  | 'happy_hour'; // Promotion temporelle (ex: happy hour)
+// Types de promotions supportés (champ `type` dans la table `promotions`)
+export type PromotionType =
+  | 'percentage'
+  | 'fixed_amount'
+  | 'promo_code'
+  | 'buy_x_get_y'
+  | 'free_product'
+  | 'free_shipping'
+  | 'combo'
+  | 'threshold'
+  | 'happy_hour';
 
-// Condition d'application d'une promotion (élément du tableau conditions)
-export interface PromotionCondition {
-  type: 'specific_product' | 'specific_category' | 'min_order_amount' | 'min_items_count' | 'promo_code' | 'buy_x_get_y' | 'threshold' | 'first_order_only';
-  value?: any; // Valeur de la condition (peut être un nombre, une chaîne, un tableau, etc.)
-  buy_quantity?: number; // Pour buy_x_get_y
-  get_quantity?: number; // Pour buy_x_get_y
-  threshold_values?: { // Pour threshold
-    amount: number;
-    discount: number;
-  }[];
-}
+// Statuts de promotion (champ `status` dans la table `promotions`)
+export type PromotionStatus = 'active' | 'inactive' | 'scheduled' | 'expired';
 
-// Configuration de la promotion (stockée dans le champ config)
-export interface PromotionConfig {
-  // Type de réduction
-  discount_type: 'percentage' | 'fixed_amount';
-  discount_value: number;
-  max_discount_amount?: number; // Plafond de réduction pour les pourcentages
-  applies_to: 'total' | 'products' | 'shipping' | 'category';
-  
-  // Éléments visuels
-  visuals?: {
-    badge_text?: string; // Texte du badge (ex: "2x1", "-20%")
-    badge_color?: string; // Couleur du texte du badge (hex)
-    badge_bg_color?: string; // Couleur de fond du badge (hex)
-    badge_bg_image?: string | null; // URL de l'image de fond du badge (Cloudinary)
-    badge_position?: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
-    banner_image?: string; // URL de l'image de la bannière
-    banner_text?: string; // Texte de la bannière
-    banner_cta?: string; // Texte du bouton d'appel à l'action
-    description?: string; // Description de la promotion
-    icon?: string; // Icône à afficher
-  };
-  
-  // Conditions temporelles (heures de la journée, jours de la semaine)
-  days_of_week?: number[]; // 0-6, 0 = dimanche
-  hours_of_day?: {
-    start: string; // Format "HH:MM"
-    end: string; // Format "HH:MM"
-  };
-  
-  // IDs de produits ou catégories concernés
+// Configuration pour les promotions "acheter X obtenir Y"
+export interface BuyXGetYConfig {
+  buy_quantity: number;
+  get_quantity: number;
   product_ids?: string[];
   category_ids?: string[];
-  
-  // Conditions spécifiques
-  promo_code?: string;
-  buy_quantity?: number;
-  get_quantity?: number;
-  min_order_amount?: number;
-  min_items_count?: number;
-  
-  // Limites d'utilisation par client
-  max_uses_per_customer?: number;
-  first_order_only?: boolean;
 }
 
-// Promotion complète (correspondant à la structure Supabase)
+// Configuration de la réduction (champ `discount` JSONB dans la base de données)
+export interface PromotionDiscount {
+  discount_type: 'percentage' | 'fixed_amount' | 'buy_x_get_y';
+  discount_value: number; // Pourcentage (0-100) ou montant fixe
+  applies_to: 'total' | 'products' | 'categories' | 'shipping';
+  product_ids?: string[];
+  category_ids?: string[];
+  buy_x_get_y_config?: BuyXGetYConfig;
+  promo_code?: string; // Code promo pour les promotions de type 'promo_code'
+  max_discount_amount?: number; // Plafond de réduction pour les pourcentages
+}
+
+// Conditions d'applicabilité (champ `conditions` JSONB dans la base de données)
+export interface PromotionConditions {
+  min_order_amount?: number; // Montant minimum de commande
+  max_order_amount?: number; // Montant maximum de commande
+  min_items_count?: number; // Nombre minimum d'articles
+  max_items_count?: number; // Nombre maximum d'articles
+  specific_products?: string[]; // IDs de produits spécifiques
+  specific_categories?: string[]; // IDs de catégories spécifiques
+  customer_groups?: string[]; // Groupes de clients (ex: 'new', 'vip')
+  order_types?: string[]; // Types de commande (ex: 'pedir_en_linea', 'delivery')
+  time_range?: {
+    start_time: string; // Format HH:MM
+    end_time: string; // Format HH:MM
+  };
+  days_of_week?: number[]; // Jours de la semaine (0 = dimanche, 6 = samedi)
+  start_date?: string; // Date de début (ISO 8601)
+  end_date?: string; // Date de fin (ISO 8601)
+  usage_limit?: number; // Limite d'utilisation globale
+  usage_limit_per_customer?: number; // Limite d'utilisation par client
+  first_order_only?: boolean; // Réservé aux premières commandes
+}
+
+// Informations visuelles (champ `visuals` JSONB dans la base de données)
+export interface PromotionVisuals {
+  banner_url?: string;
+  banner_text?: string;
+  banner_cta?: string;
+  icon_url?: string;
+  badge_text?: string;
+  badge_color?: string;
+  badge_bg_color?: string;
+  badge_bg_image?: string;
+  badge_position?: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
+  color?: string;
+  display_text?: string;
+  description?: string;
+}
+
+// Structure complète d'une promotion (correspond à la table `promotions`)
 export interface Promotion {
   id: string;
   name: string;
-  description?: string;
-  active: boolean; // Remplace status
-  start_date: string; // Date de début (ISO string)
-  end_date?: string; // Date de fin optionnelle (ISO string)
-  conditions: PromotionCondition[]; // Tableau de conditions
-  config: PromotionConfig; // Configuration complète
-  priority: number; // Priorité d'application (plus élevé = plus prioritaire)
-  stackable: boolean; // Peut être combinée avec d'autres promotions
-  usage_limit?: number; // Limite d'utilisation totale
-  usage_count: number; // Nombre d'utilisations actuelles
+  type: PromotionType;
+  status: PromotionStatus;
+  priority: number;
+  conditions: PromotionConditions;
+  discount: PromotionDiscount;
+  visuals?: PromotionVisuals;
   created_at: string;
   updated_at: string;
+  usage_count: number;
 }
 
-// Utilisation d'une promotion
-export interface PromotionUsage {
+// Structure pour une promotion appliquée à une commande (champ `applied_promotions` JSONB dans `orders`)
+export interface AppliedPromotion {
   id: string;
-  promotion_id: string;
-  order_id: string;
-  customer_phone?: string; // Pour suivre l'utilisation par client
-  discount_amount: number; // Montant de la réduction appliquée
-  applied_at: string; // Date d'application
-}
-
-// Extension de l'interface Order pour inclure les promotions
-export interface OrderWithPromotions {
-  subtotal: number; // Montant avant réduction
-  total_discount: number; // Montant total des réductions
-  promo_code?: string; // Code promo utilisé
-  applied_promotions: {
-    promotion_id: string;
-    name: string;
-    discount_amount: number;
-  }[];
+  name: string;
+  discount_amount: number;
+  discount: PromotionDiscount;
 }
 
 // Helper pour vérifier si une promotion est actuellement valide
 export const isPromotionCurrentlyValid = (promotion: Promotion): boolean => {
-  if (!promotion.active) return false;
-  
+  if (promotion.status !== 'active') return false;
+
   const now = new Date();
-  const startDate = new Date(promotion.start_date);
-  const endDate = promotion.end_date ? new Date(promotion.end_date) : null;
-  
-  if (now < startDate) return false;
-  if (endDate && now > endDate) return false;
-  
+  const conditions = promotion.conditions;
+
+  // Vérifier les dates de début et de fin
+  if (conditions.start_date) {
+    const startDate = new Date(conditions.start_date);
+    if (now < startDate) return false;
+  }
+
+  if (conditions.end_date) {
+    const endDate = new Date(conditions.end_date);
+    if (now > endDate) return false;
+  }
+
   // Vérifier la limite d'utilisation
-  if (promotion.usage_limit && promotion.usage_count >= promotion.usage_limit) {
+  if (conditions.usage_limit && promotion.usage_count >= conditions.usage_limit) {
     return false;
   }
-  
+
   return true;
 };
 
 // Helper pour vérifier les conditions temporelles (heures et jours)
 export const isPromotionValidAtTime = (promotion: Promotion): boolean => {
   const now = new Date();
-  const config = promotion.config;
-  
+  const conditions = promotion.conditions;
+
   // Vérifier le jour de la semaine
-  if (config.days_of_week && config.days_of_week.length > 0) {
+  if (conditions.days_of_week && conditions.days_of_week.length > 0) {
     const currentDay = now.getDay();
-    if (!config.days_of_week.includes(currentDay)) {
+    if (!conditions.days_of_week.includes(currentDay)) {
       return false;
     }
   }
-  
+
   // Vérifier l'heure de la journée
-  if (config.hours_of_day) {
+  if (conditions.time_range) {
     const currentHour = now.getHours();
     const currentMinute = now.getMinutes();
     const currentTimeMinutes = currentHour * 60 + currentMinute;
-    
-    const [startHour, startMinute] = config.hours_of_day.start.split(':').map(Number);
-    const [endHour, endMinute] = config.hours_of_day.end.split(':').map(Number);
-    
+
+    const [startHour, startMinute] = conditions.time_range.start_time.split(':').map(Number);
+    const [endHour, endMinute] = conditions.time_range.end_time.split(':').map(Number);
+
     const startTimeMinutes = startHour * 60 + startMinute;
     const endTimeMinutes = endHour * 60 + endMinute;
-    
+
     if (currentTimeMinutes < startTimeMinutes || currentTimeMinutes > endTimeMinutes) {
       return false;
     }
   }
-  
+
   return true;
 };
 
-// Type de compatibilité pour l'ancien code
-export type PromotionStatus = 'active' | 'inactive' | 'scheduled' | 'expired';
+// Type de compatibilité pour l'ancien code (si nécessaire)
+export interface PromotionConfig extends PromotionDiscount {
+  // Alias pour la compatibilité avec l'ancien code
+}
+
+export interface PromotionCondition {
+  // Alias pour la compatibilité avec l'ancien code
+  type: string;
+  value?: any;
+}
+

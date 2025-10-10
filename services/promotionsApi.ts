@@ -1,474 +1,403 @@
+
 import { supabase } from './supabaseClient';
-import { 
-  Promotion, 
-  PromotionConfig,
-  PromotionCondition,
-  PromotionUsage,
-  isPromotionCurrentlyValid,
-  isPromotionValidAtTime
+import {
+  Promotion,
+  AppliedPromotion,
+  PromotionType,
+  PromotionDiscount,
+  PromotionConditions,
+  BuyXGetYConfig,
 } from '../types/promotions';
-import { Order } from '../types';
+import { Order, CartItem } from '../types';
 
-// Types pour les réponses Supabase
-type SupabaseResponse<T> = {
-  data: T;
-  error: { message: string } | null;
-  status?: number;
-};
+// Fonctions utilitaires pour la validation des promotions
 
-// Fonctions utilitaires
-const unwrap = <T>(response: SupabaseResponse<T>): T => {
-  if (response.error) {
-    throw new Error(response.error.message);
-  }
-  return response.data;
-};
-
-const unwrapMaybe = <T>(response: SupabaseResponse<T | null>): T | null => {
-  if (response.error && response.status !== 406) {
-    throw new Error(response.error.message);
-  }
-  return response.data ?? null;
-};
-
-/**
- * Récupère toutes les promotions
- */
-export const fetchPromotions = async (): Promise<Promotion[]> => {
-  const response = await supabase
-    .from('promotions')
-    .select('*')
-    .order('priority', { ascending: false });
-  
-  return unwrap<Promotion[]>(response as SupabaseResponse<Promotion[]>);
-};
-
-/**
- * Récupère une promotion par son ID
- */
-export const fetchPromotionById = async (id: string): Promise<Promotion | null> => {
-  const response = await supabase
-    .from('promotions')
-    .select('*')
-    .eq('id', id)
-    .maybeSingle();
-  
-  return unwrapMaybe<Promotion>(response as SupabaseResponse<Promotion | null>);
-};
-
-/**
- * Récupère les promotions actives et valides
- */
-export const fetchActivePromotions = async (): Promise<Promotion[]> => {
-  const now = new Date().toISOString();
-  
-  const response = await supabase
-    .from('promotions')
-    .select('*')
-    .eq('active', true)
-    .lte('start_date', now)
-    .or(`end_date.is.null,end_date.gte.${now}`)
-    .order('priority', { ascending: false });
-  
-  const promotions = unwrap<Promotion[]>(response as SupabaseResponse<Promotion[]>);
-  
-  // Filtrer les promotions qui ont atteint leur limite d'utilisation
-  return promotions.filter(promo => {
-    if (promo.usage_limit && promo.usage_count >= promo.usage_limit) {
-      return false;
-    }
-    return isPromotionValidAtTime(promo);
-  });
-};
-
-/**
- * Crée une nouvelle promotion
- */
-export const createPromotion = async (promotion: Omit<Promotion, 'id' | 'created_at' | 'updated_at' | 'usage_count'>): Promise<Promotion> => {
-  const response = await supabase
-    .from('promotions')
-    .insert({
-      name: promotion.name,
-      description: promotion.description,
-      active: promotion.active,
-      start_date: promotion.start_date,
-      end_date: promotion.end_date,
-      conditions: promotion.conditions,
-      config: promotion.config,
-      priority: promotion.priority,
-      stackable: promotion.stackable,
-      usage_limit: promotion.usage_limit,
-      usage_count: 0
-    })
-    .select()
-    .single();
-  
-  return unwrap<Promotion>(response as SupabaseResponse<Promotion>);
-};
-
-/**
- * Met à jour une promotion existante
- */
-export const updatePromotion = async (id: string, promotion: Partial<Omit<Promotion, 'id' | 'created_at' | 'updated_at' | 'usage_count'>>): Promise<Promotion> => {
-  const response = await supabase
-    .from('promotions')
-    .update({
-      name: promotion.name,
-      description: promotion.description,
-      active: promotion.active,
-      start_date: promotion.start_date,
-      end_date: promotion.end_date,
-      conditions: promotion.conditions,
-      config: promotion.config,
-      priority: promotion.priority,
-      stackable: promotion.stackable,
-      usage_limit: promotion.usage_limit
-    })
-    .eq('id', id)
-    .select()
-    .single();
-  
-  return unwrap<Promotion>(response as SupabaseResponse<Promotion>);
-};
-
-/**
- * Supprime une promotion
- */
-export const deletePromotion = async (id: string): Promise<void> => {
-  const response = await supabase
-    .from('promotions')
-    .delete()
-    .eq('id', id);
-  
-  unwrap(response as SupabaseResponse<null>);
-};
-
-/**
- * Active ou désactive une promotion
- */
-export const togglePromotionActive = async (id: string, active: boolean): Promise<Promotion> => {
-  const response = await supabase
-    .from('promotions')
-    .update({ active })
-    .eq('id', id)
-    .select()
-    .single();
-  
-  return unwrap<Promotion>(response as SupabaseResponse<Promotion>);
-};
-
-/**
- * Récupère un code promo par son code
- */
-export const fetchPromotionByCode = async (code: string): Promise<Promotion | null> => {
-  const activePromotions = await fetchActivePromotions();
-  
-  return activePromotions.find(promo => 
-    promo.config.promo_code?.toLowerCase() === code.toLowerCase()
-  ) || null;
-};
-
-/**
- * Enregistre l'utilisation d'une promotion
- */
-export const recordPromotionUsage = async (usage: Omit<PromotionUsage, 'id' | 'applied_at'>): Promise<PromotionUsage> => {
-  // Incrémenter le compteur d'utilisation de la promotion
-  await supabase
-    .from('promotions')
-    .update({ usage_count: supabase.sql`usage_count + 1` })
-    .eq('id', usage.promotion_id);
-  
-  // Enregistrer l'utilisation
-  const response = await supabase
-    .from('promotion_usages')
-    .insert({
-      promotion_id: usage.promotion_id,
-      order_id: usage.order_id,
-      customer_phone: usage.customer_phone || null,
-      discount_amount: usage.discount_amount
-    })
-    .select()
-    .single();
-  
-  return unwrap<PromotionUsage>(response as SupabaseResponse<PromotionUsage>);
-};
-
-/**
- * Récupère les utilisations d'une promotion
- */
-export const fetchPromotionUsages = async (promotionId: string): Promise<PromotionUsage[]> => {
-  const response = await supabase
-    .from('promotion_usages')
-    .select('*')
-    .eq('promotion_id', promotionId)
-    .order('applied_at', { ascending: false });
-  
-  return unwrap<PromotionUsage[]>(response as SupabaseResponse<PromotionUsage[]>);
-};
-
-/**
- * Récupère les utilisations d'une promotion par un client
- */
-export const fetchPromotionUsagesByCustomer = async (promotionId: string, customerPhone: string): Promise<PromotionUsage[]> => {
-  const response = await supabase
-    .from('promotion_usages')
-    .select('*')
-    .eq('promotion_id', promotionId)
-    .eq('customer_phone', customerPhone)
-    .order('applied_at', { ascending: false});
-  
-  return unwrap<PromotionUsage[]>(response as SupabaseResponse<PromotionUsage[]>);
-};
-
-/**
- * Vérifie si un client peut utiliser une promotion (basé sur les limites d'utilisation)
- */
-export const canCustomerUsePromotion = async (promotionId: string, customerPhone: string): Promise<boolean> => {
-  const promotion = await fetchPromotionById(promotionId);
-  if (!promotion || !isPromotionCurrentlyValid(promotion)) return false;
-  
-  // Vérifier si la promotion a une limite d'utilisation par client
-  if (!promotion.config.max_uses_per_customer) return true;
-  
-  // Récupérer les utilisations par ce client
-  const usages = await fetchPromotionUsagesByCustomer(promotionId, customerPhone);
-  
-  // Vérifier si le client a dépassé la limite
-  return usages.length < (promotion.config.max_uses_per_customer || Infinity);
-};
-
-/**
- * Vérifie si une promotion peut encore être utilisée (basé sur le nombre total d'utilisations)
- */
-export const canPromotionBeUsed = async (promotionId: string): Promise<boolean> => {
-  const promotion = await fetchPromotionById(promotionId);
-  if (!promotion || !isPromotionCurrentlyValid(promotion)) return false;
-  
-  // Vérifier si la promotion a une limite d'utilisation totale
-  if (!promotion.usage_limit) return true;
-  
-  // Vérifier si la promotion a dépassé la limite
-  return promotion.usage_count < promotion.usage_limit;
-};
-
-/**
- * Vérifie si une promotion est applicable à une commande
- */
-export const isPromotionApplicableToOrder = (promotion: Promotion, order: Order): boolean => {
-  if (!isPromotionCurrentlyValid(promotion)) return false;
-  if (!isPromotionValidAtTime(promotion)) return false;
-  
-  const config = promotion.config;
-  
-  // Vérifier le montant minimum de commande
-    if (config.min_order_amount && (!order.subtotal || order.subtotal < config.min_order_amount)) {
-    return false;
-  }
-  
-  // Vérifier le nombre minimum d'articles
-  if (config.min_items_count) {
-    const totalItems = order.items.reduce((sum, item) => sum + item.quantite, 0);
-    if (totalItems < config.min_items_count) {
-      return false;
-    }
-  }
-  
-  // Vérifier les produits concernés
-  if (config.product_ids && config.product_ids.length > 0) {
-    const hasMatchingProduct = order.items.some(item => 
-      config.product_ids?.includes(item.produitRef)
-    );
-    if (!hasMatchingProduct) {
-      return false;
-    }
-  }
-  
-  // Vérifier les catégories concernées (nécessite que les items aient une propriété categoria_id)
-  if (config.category_ids && config.category_ids.length > 0) {
-    const hasMatchingCategory = order.items.some((item: any) => 
-      config.category_ids?.includes(item.categoria_id)
-    );
-    if (!hasMatchingCategory) {
-      return false;
-    }
-  }
-  
+const isPromotionActive = (promotion: Promotion): boolean => {
+  if (promotion.status !== 'active') return false;
+  const now = new Date();
+  if (promotion.conditions.start_date && new Date(promotion.conditions.start_date) > now) return false;
+  if (promotion.conditions.end_date && new Date(promotion.conditions.end_date) < now) return false;
+  if (promotion.conditions.usage_limit && promotion.usage_count >= promotion.conditions.usage_limit) return false;
   return true;
 };
 
-/**
- * Calcule le montant de réduction pour une promotion appliquée à une commande
- */
-export const calculatePromotionDiscount = (promotion: Promotion, order: Order): number => {
-  const config = promotion.config;
-  
-  // Cas de la réduction en pourcentage
-  if (config.discount_type === 'percentage') {
-    let baseAmount = 0;
-    
-    // Déterminer le montant de base sur lequel appliquer la réduction
-    if (config.applies_to === 'total') {
-      baseAmount = order.subtotal || order.total;
-    } else if (config.applies_to === 'products' && config.product_ids) {
-      // Calculer le total des produits concernés
-      baseAmount = order.items
-        .filter(item => config.product_ids?.includes(item.produitRef))
-        .reduce((sum, item) => sum + (item.prix_unitaire * item.quantite), 0);
-    } else if (config.applies_to === 'category' && config.category_ids) {
-      // Calculer le total des produits de la catégorie concernée
-      baseAmount = order.items
-        .filter((item: any) => config.category_ids?.includes(item.categoria_id))
-        .reduce((sum, item) => sum + (item.prix_unitaire * item.quantite), 0);
-    } else if (config.applies_to === 'shipping') {
-      // Pas de gestion des frais de livraison pour le moment
-      baseAmount = 0;
-    }
-    
-    // Calculer la réduction
-    let discountAmount = baseAmount * (config.discount_value / 100);
-    
-    // Appliquer le plafond si défini
-    if (config.max_discount_amount && discountAmount > config.max_discount_amount) {
-      discountAmount = config.max_discount_amount;
-    }
-    
-    return discountAmount;
+const checkTimeAndDay = (conditions: PromotionConditions): boolean => {
+  const now = new Date();
+  if (conditions.days_of_week && !conditions.days_of_week.includes(now.getDay())) return false;
+  if (conditions.time_range) {
+    const [startHour, startMinute] = conditions.time_range.start_time.split(':').map(Number);
+    const [endHour, endMinute] = conditions.time_range.end_time.split(':').map(Number);
+    const currentTime = now.getHours() * 60 + now.getMinutes();
+    const startTime = startHour * 60 + startMinute;
+    const endTime = endHour * 60 + endMinute;
+    if (currentTime < startTime || currentTime > endTime) return false;
   }
-  
-  // Cas de la réduction en montant fixe
-  if (config.discount_type === 'fixed_amount') {
-    return config.discount_value;
-  }
-
-  // Cas de la promotion 'Acheter X, obtenir Y gratuit'
-  if (config.discount_type === 'buy_x_get_y' && config.buy_x_get_y_config) {
-    const { buy_quantity, get_quantity, product_ids, category_ids } = config.buy_x_get_y_config;
-    let freeItemsCount = 0;
-    let cheapestItemPrice = 0;
-
-    if (product_ids && product_ids.length > 0) {
-      // Calculer pour des produits spécifiques
-      const applicableItems = order.items.filter(item => product_ids.includes(item.produitRef));
-      const totalApplicableQuantity = applicableItems.reduce((sum, item) => sum + item.quantite, 0);
-      freeItemsCount = Math.floor(totalApplicableQuantity / (buy_quantity + get_quantity)) * get_quantity;
-      if (freeItemsCount > 0) {
-        // Trouver le prix de l'article le moins cher parmi les articles applicables
-        cheapestItemPrice = applicableItems.reduce((minPrice, item) => Math.min(minPrice, item.prix_unitaire), Infinity);
-      }
-    } else if (category_ids && category_ids.length > 0) {
-      // Calculer pour des catégories spécifiques
-      const applicableItems = order.items.filter((item: any) => category_ids.includes(item.categoria_id));
-      const totalApplicableQuantity = applicableItems.reduce((sum, item) => sum + item.quantite, 0);
-      freeItemsCount = Math.floor(totalApplicableQuantity / (buy_quantity + get_quantity)) * get_quantity;
-      if (freeItemsCount > 0) {
-        // Trouver le prix de l'article le moins cher parmi les articles applicables
-        cheapestItemPrice = applicableItems.reduce((minPrice, item) => Math.min(minPrice, item.prix_unitaire), Infinity);
-      }
-    } else {
-      // Calculer pour tous les articles de la commande
-      const totalQuantity = order.items.reduce((sum, item) => sum + item.quantite, 0);
-      freeItemsCount = Math.floor(totalQuantity / (buy_quantity + get_quantity)) * get_quantity;
-      if (freeItemsCount > 0) {
-        // Pour les promotions globales, le prix de l'article gratuit est le prix de l'article le moins cher dans le panier
-        const allItemPrices = order.items.map(item => item.prix_unitaire);
-        cheapestItemPrice = allItemPrices.length > 0 ? Math.min(...allItemPrices) : 0;
-      }
-    }
-
-    return freeItemsCount * cheapestItemPrice;
-  }
-  
-  return 0;
+  return true;
 };
 
-/**
- * Applique les promotions à une commande
- */
+const checkOrderConditions = (order: Order, conditions: PromotionConditions): boolean => {
+  const orderSubtotal = order.subtotal || order.total;
+  if (conditions.min_order_amount && orderSubtotal < conditions.min_order_amount) return false;
+  if (conditions.max_order_amount && orderSubtotal > conditions.max_order_amount) return false;
+  const totalItems = order.items.reduce((acc, item) => acc + item.quantite, 0);
+  if (conditions.min_items_count && totalItems < conditions.min_items_count) return false;
+  if (conditions.max_items_count && totalItems > conditions.max_items_count) return false;
+  if (conditions.order_types && !conditions.order_types.includes(order.type)) return false;
+  if (conditions.first_order_only) {
+    // La logique de vérification de la première commande doit être implémentée
+    // en se basant sur l'historique des commandes du client.
+    // Pour l'instant, nous laissons cette condition de côté.
+  }
+  return true;
+};
+
+const isPromotionApplicableToOrder = (promotion: Promotion, order: Order): boolean => {
+  if (!isPromotionActive(promotion)) return false;
+  if (!checkTimeAndDay(promotion.conditions)) return false;
+  if (!checkOrderConditions(order, promotion.conditions)) return false;
+  return true;
+};
+
+// Fonctions de calcul des réductions par type de promotion
+
+const calculatePercentageDiscount = (order: Order, discount: PromotionDiscount): number => {
+  let applicableAmount = 0;
+  const orderSubtotal = order.subtotal || order.total;
+  
+  if (discount.applies_to === 'total') {
+    applicableAmount = orderSubtotal;
+  } else if (discount.applies_to === 'products' && discount.product_ids) {
+    applicableAmount = order.items
+      .filter(item => discount.product_ids?.includes(item.produitRef))
+      .reduce((acc, item) => acc + item.prix_unitaire * item.quantite, 0);
+  } else if (discount.applies_to === 'categories' && discount.category_ids) {
+    // La logique de catégorie nécessite que les produits aient une référence de catégorie
+    // applicableAmount = ...
+  }
+
+  let discountAmount = (applicableAmount * discount.discount_value) / 100;
+  if (discount.max_discount_amount) {
+    discountAmount = Math.min(discountAmount, discount.max_discount_amount);
+  }
+  return discountAmount;
+};
+
+const calculateFixedAmountDiscount = (order: Order, discount: PromotionDiscount): number => {
+  return discount.discount_value;
+};
+
+const calculateBuyXGetYDiscount = (order: Order, discount: PromotionDiscount): number => {
+  const config = discount.buy_x_get_y_config;
+  if (!config) return 0;
+
+  const applicableItems = order.items.filter(item => 
+    (config.product_ids && config.product_ids.includes(item.produitRef))
+    // La logique de catégorie peut être ajoutée si nécessaire
+  );
+
+  const totalQuantity = applicableItems.reduce((acc, item) => acc + item.quantite, 0);
+  if (totalQuantity < config.buy_quantity + config.get_quantity) return 0;
+
+  const numberOfDiscounts = Math.floor(totalQuantity / (config.buy_quantity + config.get_quantity));
+  const itemsToDiscount = applicableItems.sort((a, b) => a.prix_unitaire - b.prix_unitaire).slice(0, numberOfDiscounts * config.get_quantity);
+  
+  return itemsToDiscount.reduce((acc, item) => acc + item.prix_unitaire, 0);
+};
+
+const calculateFreeShippingDiscount = (order: Order): number => {
+  // La valeur de la livraison doit être récupérée depuis les paramètres de la commande ou du site
+  const shippingCost = order.shipping_cost || 0;
+  return shippingCost;
+};
+
+const calculatePromotionDiscount = (promotion: Promotion, order: Order): number => {
+  switch (promotion.type) {
+    case 'percentage':
+      return calculatePercentageDiscount(order, promotion.discount);
+    case 'fixed_amount':
+      return calculateFixedAmountDiscount(order, promotion.discount);
+    case 'promo_code': // Les codes promos peuvent être de type pourcentage ou montant fixe
+      if (promotion.discount.discount_type === 'percentage') {
+        return calculatePercentageDiscount(order, promotion.discount);
+      } else if (promotion.discount.discount_type === 'fixed_amount') {
+        return calculateFixedAmountDiscount(order, promotion.discount);
+      }
+      return 0;
+    case 'buy_x_get_y':
+      return calculateBuyXGetYDiscount(order, promotion.discount);
+    case 'free_shipping':
+      return calculateFreeShippingDiscount(order);
+    // Les autres types de promotions (free_product, combo, threshold, happy_hour) 
+    // nécessitent une logique plus complexe qui sera ajoutée ultérieurement.
+    default:
+      return 0;
+  }
+};
+
+// Fonction principale pour appliquer les promotions
+
 export const applyPromotionsToOrder = async (order: Order): Promise<Order> => {
-  // Récupérer toutes les promotions actives
-  const activePromotions = await fetchActivePromotions();
-  
-  // Initialiser les valeurs
-  const subtotal = order.items.reduce((acc, item) => acc + (item.prix_unitaire * item.quantite), 0);
-  let totalDiscount = 0;
-  const appliedPromotions: { promotion_id: string; name: string; discount_amount: number }[] = [];
-  
-  // Vérifier si un code promo est fourni
+  const mutableOrder = { 
+    ...order, 
+    applied_promotions: [], 
+    total_discount: 0,
+    subtotal: order.subtotal || order.total
+  };
+
+  const { data: activePromotions, error } = await supabase
+    .from('promotions')
+    .select('*')
+    .eq('status', 'active');
+
+  if (error || !activePromotions) {
+    console.error('Error fetching active promotions:', error);
+    return order; // Retourne la commande originale en cas d'erreur
+  }
+
+  const applicablePromotions = activePromotions
+    .filter(promo => isPromotionApplicableToOrder(promo, mutableOrder))
+    .sort((a, b) => b.priority - a.priority);
+
+  let currentSubtotal = mutableOrder.subtotal!;
+
+  for (const promo of applicablePromotions) {
+    const discount = calculatePromotionDiscount(promo, mutableOrder);
+    if (discount > 0) {
+      const cappedDiscount = Math.min(discount, currentSubtotal);
+      currentSubtotal -= cappedDiscount;
+      mutableOrder.total_discount! += cappedDiscount;
+      mutableOrder.applied_promotions!.push({
+        promotion_id: promo.id,
+        name: promo.name,
+        discount_amount: cappedDiscount,
+      });
+    }
+  }
+
+  // Gestion du code promo s'il y en a un
   if (order.promo_code) {
     const promoCodePromotion = await fetchPromotionByCode(order.promo_code);
-    if (promoCodePromotion && isPromotionApplicableToOrder(promoCodePromotion, order)) {
-      const discountAmount = calculatePromotionDiscount(promoCodePromotion, order);
-      if (discountAmount > 0) {
-        totalDiscount += discountAmount;
-        appliedPromotions.push({
+
+    if (promoCodePromotion && isPromotionApplicableToOrder(promoCodePromotion, mutableOrder)) {
+      const discount = calculatePromotionDiscount(promoCodePromotion, mutableOrder);
+      if (discount > 0) {
+        const cappedDiscount = Math.min(discount, currentSubtotal);
+        currentSubtotal -= cappedDiscount;
+        mutableOrder.total_discount! += cappedDiscount;
+        mutableOrder.applied_promotions!.push({
           promotion_id: promoCodePromotion.id,
           name: promoCodePromotion.name,
-          discount_amount: discountAmount
+          discount_amount: cappedDiscount,
         });
       }
     }
   }
-  
-  // Appliquer les autres promotions automatiques (par ordre de priorité)
-  for (const promotion of activePromotions) {
-    // Ignorer les promotions de type code promo (déjà traitées)
-    if (promotion.config.promo_code) continue;
-    
-    // Si la promotion n'est pas stackable et qu'une promotion a déjà été appliquée, ignorer
-    if (!promotion.stackable && appliedPromotions.length > 0) continue;
-    
-    // Vérifier si la promotion est applicable
-    if (isPromotionApplicableToOrder(promotion, order)) {
-      const discountAmount = calculatePromotionDiscount(promotion, order);
-      if (discountAmount > 0) {
-        totalDiscount += discountAmount;
-        appliedPromotions.push({
-          promotion_id: promotion.id,
-          name: promotion.name,
-          discount_amount: discountAmount
-        });
-        
-        // Si la promotion n'est pas stackable, arrêter ici
-        if (!promotion.stackable) break;
-      }
-    }
-  }
-  
-  // Mettre à jour la commande avec les promotions appliquées
-  const finalTotal = subtotal - totalDiscount;
-  return {
-    ...order,
-    subtotal: subtotal,
-    total_discount: totalDiscount,
-    total: Math.max(0, finalTotal), // Assurez-vous que le total ne soit pas négatif
-    applied_promotions: appliedPromotions
-  };
+
+  mutableOrder.total = currentSubtotal;
+  return mutableOrder;
 };
 
-/**
- * Enregistre les utilisations de promotions pour une commande finalisée
- */
-export const recordPromotionUsagesForOrder = async (order: Order): Promise<void> => {
-  if (!order.applied_promotions || order.applied_promotions.length === 0) {
-    return;
+// Fonctions CRUD pour la gestion des promotions
+
+export const fetchPromotions = async (): Promise<Promotion[]> => {
+  const { data, error } = await supabase
+    .from('promotions')
+    .select('*')
+    .order('priority', { ascending: false });
+
+  if (error) {
+    console.error('Error fetching promotions:', error);
+    throw new Error('Impossible de récupérer les promotions');
   }
-  
-  // Enregistrer chaque utilisation de promotion
-  for (const appliedPromotion of order.applied_promotions) {
+
+  return data || [];
+};
+
+export const fetchPromotionById = async (id: string): Promise<Promotion | null> => {
+  const { data, error } = await supabase
+    .from('promotions')
+    .select('*')
+    .eq('id', id)
+    .single();
+
+  if (error) {
+    console.error('Error fetching promotion:', error);
+    return null;
+  }
+
+  return data;
+};
+
+export const fetchActivePromotions = async (): Promise<Promotion[]> => {
+  const { data, error } = await supabase
+    .from('promotions')
+    .select('*')
+    .eq('status', 'active')
+    .order('priority', { ascending: false });
+
+  if (error) {
+    console.error('Error fetching active promotions:', error);
+    throw new Error('Impossible de récupérer les promotions actives');
+  }
+
+  return data || [];
+};
+
+export const createPromotion = async (
+  promotion: Omit<Promotion, 'id' | 'created_at' | 'updated_at' | 'usage_count'>
+): Promise<Promotion> => {
+  const { data, error } = await supabase
+    .from('promotions')
+    .insert([{ ...promotion, usage_count: 0 }])
+    .select()
+    .single();
+
+  if (error) {
+    console.error('Error creating promotion:', error);
+    throw new Error('Impossible de créer la promotion');
+  }
+
+  return data;
+};
+
+export const updatePromotion = async (
+  id: string,
+  promotion: Partial<Omit<Promotion, 'id' | 'created_at' | 'updated_at' | 'usage_count'>>
+): Promise<Promotion> => {
+  const { data, error } = await supabase
+    .from('promotions')
+    .update(promotion)
+    .eq('id', id)
+    .select()
+    .single();
+
+  if (error) {
+    console.error('Error updating promotion:', error);
+    throw new Error('Impossible de mettre à jour la promotion');
+  }
+
+  return data;
+};
+
+export const updatePromotionStatus = async (
+  id: string,
+  status: PromotionStatus
+): Promise<Promotion> => {
+  return updatePromotion(id, { status });
+};
+
+export const deletePromotion = async (id: string): Promise<void> => {
+  const { error } = await supabase
+    .from('promotions')
+    .delete()
+    .eq('id', id);
+
+  if (error) {
+    console.error('Error deleting promotion:', error);
+    throw new Error('Impossible de supprimer la promotion');
+  }
+};
+
+export const fetchPromotionByCode = async (code: string): Promise<Promotion | null> => {
+  const { data, error } = await supabase
+    .from('promotions')
+    .select('*')
+    .eq('type', 'promo_code')
+    .eq('status', 'active');
+
+  if (error) {
+    console.error('Error fetching promotion by code:', error);
+    return null;
+  }
+
+  // Filtrer par code promo dans le champ discount JSONB
+  const promotion = data?.find(p => p.discount?.promo_code === code);
+  return promotion || null;
+};
+
+// Fonctions pour l'enregistrement des utilisations de promotions
+
+interface PromotionUsage {
+  id: string;
+  promotion_id: string;
+  order_id: string;
+  customer_phone?: string;
+  discount_amount: number;
+  applied_at: string;
+}
+
+export const recordPromotionUsage = async (
+  usage: Omit<PromotionUsage, 'id' | 'applied_at'>
+): Promise<void> => {
+  const { error } = await supabase
+    .from('promotion_usages')
+    .insert([usage]);
+
+  if (error) {
+    console.error('Error recording promotion usage:', error);
+    throw new Error('Impossible d\'enregistrer l\'utilisation de la promotion');
+  }
+
+  // Incrémenter le compteur d'utilisation de la promotion
+  const { error: updateError } = await supabase.rpc('increment', {
+    row_id: usage.promotion_id,
+    table_name: 'promotions',
+    column_name: 'usage_count'
+  });
+
+  if (updateError) {
+    console.error('Error incrementing usage count:', updateError);
+  }
+};
+
+export const recordPromotionUsagesForOrder = async (order: Order): Promise<void> => {
+  if (!order.applied_promotions || order.applied_promotions.length === 0) return;
+
+  for (const appliedPromo of order.applied_promotions) {
     await recordPromotionUsage({
-      promotion_id: appliedPromotion.promotion_id,
+      promotion_id: appliedPromo.promotion_id,
       order_id: order.id,
       customer_phone: order.clientInfo?.telephone,
-      discount_amount: appliedPromotion.discount_amount
+      discount_amount: appliedPromo.discount_amount,
     });
   }
 };
 
-/**
- * Fonction de compatibilité pour l'ancien code utilisant status au lieu de active
- * @deprecated Utilisez togglePromotionActive à la place
- */
-export const updatePromotionStatus = async (id: string, status: 'active' | 'inactive' | 'scheduled' | 'expired'): Promise<Promotion> => {
-  const active = status === 'active';
-  return togglePromotionActive(id, active);
+export const fetchPromotionUsages = async (promotionId: string): Promise<PromotionUsage[]> => {
+  const { data, error } = await supabase
+    .from('promotion_usages')
+    .select('*')
+    .eq('promotion_id', promotionId)
+    .order('applied_at', { ascending: false });
+
+  if (error) {
+    console.error('Error fetching promotion usages:', error);
+    return [];
+  }
+
+  return data || [];
 };
+
+export const canCustomerUsePromotion = async (
+  promotionId: string,
+  customerPhone: string
+): Promise<boolean> => {
+  const promotion = await fetchPromotionById(promotionId);
+  if (!promotion) return false;
+
+  if (!promotion.conditions.usage_limit_per_customer) return true;
+
+  const { data, error } = await supabase
+    .from('promotion_usages')
+    .select('*')
+    .eq('promotion_id', promotionId)
+    .eq('customer_phone', customerPhone);
+
+  if (error) {
+    console.error('Error checking customer promotion usage:', error);
+    return false;
+  }
+
+  return (data?.length || 0) < promotion.conditions.usage_limit_per_customer;
+};
+

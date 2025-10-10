@@ -367,7 +367,7 @@ export const calculatePromotionDiscount = (promotion: Promotion, order: Order): 
     } else {
       // Calculer pour tous les articles de la commande
       const totalQuantity = order.items.reduce((sum, item) => sum + item.quantite, 0);
-      freeItemsCount = Math.floor(totalQuantity / (buy_quantity + get_quantity)) * get_quantity;
+      freeItemsCount = Math.floor(totalQuantity / buy_quantity) * get_quantity;
       if (freeItemsCount > 0) {
         const sortedPrices = order.items.map(item => item.prix_unitaire).sort((a, b) => a - b);
         cheapestItemPrice = sortedPrices[0];

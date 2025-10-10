@@ -305,21 +305,76 @@ const OrderMenuView: React.FC<OrderMenuViewProps> = ({ onOrderSubmitted }) => {
         return products.filter(p => p.categoria_id === activeCategoryId);
     }, [products, activeCategoryId]);
 
-    const total = useMemo(() => {
-        const subtotal = cart.reduce((acc, item) => acc + item.quantite * item.prix_unitaire, 0);
-        if (cart.length === 0) {
-            setIsFreeShipping(false);
-            return subtotal;
-        }
-        
-        // Check if free shipping applies
-        const qualifiesForFreeShipping = subtotal >= freeShippingMinAmount;
-        setIsFreeShipping(qualifiesForFreeShipping);
-        
-        const deliveryFee = qualifiesForFreeShipping ? 0 : DOMICILIO_FEE;
-        const totalWithDelivery = subtotal + deliveryFee;
-        return Math.max(0, totalWithDelivery - promoCodeDiscount);
-    }, [cart, promoCodeDiscount, freeShippingMinAmount]);
+    const [orderTotals, setOrderTotals] = useState({
+        subtotal: 0,
+        total: 0,
+        automaticPromotionsDiscount: 0,
+        promoCodeDiscount: 0,
+        deliveryFee: 0,
+        appliedPromotions: []
+    });
+
+    useEffect(() => {
+        const calculateOrderTotals = async () => {
+            const currentSubtotal = cart.reduce((acc, item) => acc + item.quantite * item.prix_unitaire, 0);
+
+            if (cart.length === 0) {
+                setOrderTotals({
+                    subtotal: 0,
+                    total: 0,
+                    automaticPromotionsDiscount: 0,
+                    promoCodeDiscount: 0,
+                    deliveryFee: 0,
+                    appliedPromotions: []
+                });
+                setIsFreeShipping(false);
+                return;
+            }
+
+            const tempOrder: Order = {
+                id: 'temp',
+                items: cart,
+                subtotal: currentSubtotal,
+                total: currentSubtotal,
+                total_discount: 0,
+                applied_promotions: [],
+                promo_code: appliedPromoCode || undefined,
+                clientInfo: clientInfo,
+                order_type: orderType,
+                payment_method: paymentMethod,
+                status: 'pending',
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+            };
+
+            const updatedOrder = await applyPromotionsToOrder(tempOrder);
+
+            const totalDiscount = updatedOrder.total_discount || 0;
+            const currentPromoCodeDiscount = updatedOrder.applied_promotions.find(p => p.config?.promo_code === appliedPromoCode)?.discount_amount || 0;
+            const currentAutomaticPromotionsDiscount = totalDiscount - currentPromoCodeDiscount;
+
+            const qualifiesForFreeShipping = (currentSubtotal - totalDiscount) >= freeShippingMinAmount;
+            setIsFreeShipping(qualifiesForFreeShipping);
+            const currentDeliveryFee = (orderType === 'pedir_en_linea' && !qualifiesForFreeShipping) ? DOMICILIO_FEE : 0;
+
+            setOrderTotals({
+                subtotal: currentSubtotal,
+                total: Math.max(0, currentSubtotal - totalDiscount + currentDeliveryFee),
+                automaticPromotionsDiscount: currentAutomaticPromotionsDiscount,
+                promoCodeDiscount: currentPromoCodeDiscount,
+                deliveryFee: currentDeliveryFee,
+                appliedPromotions: updatedOrder.applied_promotions
+            });
+        };
+
+        calculateOrderTotals();
+    }, [cart, appliedPromoCode, freeShippingMinAmount, orderType, clientInfo, paymentMethod]);
+
+    const { subtotal, total, automaticPromotionsDiscount, promoCodeDiscount: currentPromoCodeDiscount, deliveryFee, appliedPromotions } = orderTotals;
+
+    useEffect(() => {
+        setPromoCodeDiscount(currentPromoCodeDiscount);
+    }, [currentPromoCodeDiscount]);
 
     const handleProductClick = (product: Product) => {
         setSelectedProduct({product});

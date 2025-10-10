@@ -339,6 +339,43 @@ export const calculatePromotionDiscount = (promotion: Promotion, order: Order): 
   if (config.discount_type === 'fixed_amount') {
     return config.discount_value;
   }
+
+  // Cas de la promotion 'Acheter X, obtenir Y gratuit'
+  if (config.discount_type === 'buy_x_get_y' && config.buy_x_get_y_config) {
+    const { buy_quantity, get_quantity, product_ids, category_ids } = config.buy_x_get_y_config;
+    let freeItemsCount = 0;
+    let cheapestItemPrice = 0;
+
+    if (product_ids && product_ids.length > 0) {
+      // Calculer pour des produits spécifiques
+      const applicableItems = order.items.filter(item => product_ids.includes(item.produitRef));
+      const totalApplicableQuantity = applicableItems.reduce((sum, item) => sum + item.quantite, 0);
+      freeItemsCount = Math.floor(totalApplicableQuantity / (buy_quantity + get_quantity)) * get_quantity;
+      if (freeItemsCount > 0) {
+        // Trouver le prix de l'article le moins cher parmi les articles applicables
+        cheapestItemPrice = applicableItems.reduce((minPrice, item) => Math.min(minPrice, item.prix_unitaire), Infinity);
+      }
+    } else if (category_ids && category_ids.length > 0) {
+      // Calculer pour des catégories spécifiques
+      const applicableItems = order.items.filter((item: any) => category_ids.includes(item.categoria_id));
+      const totalApplicableQuantity = applicableItems.reduce((sum, item) => sum + item.quantite, 0);
+      freeItemsCount = Math.floor(totalApplicableQuantity / (buy_quantity + get_quantity)) * get_quantity;
+      if (freeItemsCount > 0) {
+        // Trouver le prix de l'article le moins cher parmi les articles applicables
+        cheapestItemPrice = applicableItems.reduce((minPrice, item) => Math.min(minPrice, item.prix_unitaire), Infinity);
+      }
+    } else {
+      // Calculer pour tous les articles de la commande
+      const totalQuantity = order.items.reduce((sum, item) => sum + item.quantite, 0);
+      freeItemsCount = Math.floor(totalQuantity / (buy_quantity + get_quantity)) * get_quantity;
+      if (freeItemsCount > 0) {
+        const sortedPrices = order.items.map(item => item.prix_unitaire).sort((a, b) => a - b);
+        cheapestItemPrice = sortedPrices[0];
+      }
+    }
+
+    return freeItemsCount * cheapestItemPrice;
+  }
   
   return 0;
 };
@@ -351,7 +388,7 @@ export const applyPromotionsToOrder = async (order: Order): Promise<Order> => {
   const activePromotions = await fetchActivePromotions();
   
   // Initialiser les valeurs
-  const subtotal = order.total;
+  const subtotal = order.items.reduce((acc, item) => acc + (item.prix_unitaire * item.quantite), 0);
   let totalDiscount = 0;
   const appliedPromotions: { promotion_id: string; name: string; discount_amount: number }[] = [];
   
@@ -397,11 +434,12 @@ export const applyPromotionsToOrder = async (order: Order): Promise<Order> => {
   }
   
   // Mettre à jour la commande avec les promotions appliquées
+  const finalTotal = subtotal - totalDiscount;
   return {
     ...order,
-    subtotal,
+    subtotal: subtotal,
     total_discount: totalDiscount,
-    total: subtotal - totalDiscount,
+    total: Math.max(0, finalTotal), // Assurez-vous que le total ne soit pas négatif
     applied_promotions: appliedPromotions
   };
 };

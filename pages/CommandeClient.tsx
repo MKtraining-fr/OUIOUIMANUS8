@@ -353,21 +353,10 @@ const OrderMenuView: React.FC<OrderMenuViewProps> = ({ onOrderSubmitted }) => {
             const currentPromoCodeDiscount = updatedOrder.applied_promotions.find(p => p.config?.promo_code === appliedPromoCode)?.discount_amount || 0;
             const currentAutomaticPromotionsDiscount = totalDiscount - currentPromoCodeDiscount;
 
-            const qualifiesForFreeShipping = (currentSubtotal - totalDiscount) >= freeShippingMinAmount;
+            const subtotalAfterAutomaticPromotions = currentSubtotal - currentAutomaticPromotionsDiscount;
+            const qualifiesForFreeShipping = subtotalAfterAutomaticPromotions >= freeShippingMinAmount;
             setIsFreeShipping(qualifiesForFreeShipping);
             const currentDeliveryFee = (orderType === 'pedir_en_linea' && !qualifiesForFreeShipping) ? DOMICILIO_FEE : 0;
-
-            const finalTotal = currentSubtotal - totalDiscount + currentDeliveryFee;
-
-            setOrderTotals({
-                subtotal: currentSubtotal,
-                total: Math.max(0, finalTotal),
-                automaticPromotionsDiscount: currentAutomaticPromotionsDiscount,
-                promoCodeDiscount: currentPromoCodeDiscount,
-                deliveryFee: currentDeliveryFee,
-                appliedPromotions: updatedOrder.applied_promotions
-            });
-
 
             setOrderTotals({
                 subtotal: currentSubtotal,

@@ -369,8 +369,9 @@ export const calculatePromotionDiscount = (promotion: Promotion, order: Order): 
       const totalQuantity = order.items.reduce((sum, item) => sum + item.quantite, 0);
       freeItemsCount = Math.floor(totalQuantity / (buy_quantity + get_quantity)) * get_quantity;
       if (freeItemsCount > 0) {
-        const sortedPrices = order.items.map(item => item.prix_unitaire).sort((a, b) => a - b);
-        cheapestItemPrice = sortedPrices.length > 0 ? sortedPrices[0] : 0;
+        // Pour les promotions globales, le prix de l'article gratuit est le prix de l'article le moins cher dans le panier
+        const allItemPrices = order.items.map(item => item.prix_unitaire);
+        cheapestItemPrice = allItemPrices.length > 0 ? Math.min(...allItemPrices) : 0;
       }
     }
 

@@ -261,7 +261,7 @@ export const isPromotionApplicableToOrder = (promotion: Promotion, order: Order)
   const config = promotion.config;
   
   // Vérifier le montant minimum de commande
-  if (config.min_order_amount && (!order.total || order.total < config.min_order_amount)) {
+    if (config.min_order_amount && (!order.subtotal || order.subtotal < config.min_order_amount)) {
     return false;
   }
   
@@ -350,7 +350,7 @@ export const calculatePromotionDiscount = (promotion: Promotion, order: Order): 
       // Calculer pour des produits spécifiques
       const applicableItems = order.items.filter(item => product_ids.includes(item.produitRef));
       const totalApplicableQuantity = applicableItems.reduce((sum, item) => sum + item.quantite, 0);
-      freeItemsCount = Math.floor(totalApplicableQuantity / buy_quantity) * get_quantity;
+      freeItemsCount = Math.floor(totalApplicableQuantity / (buy_quantity + get_quantity)) * get_quantity;
       if (freeItemsCount > 0) {
         // Trouver le prix de l'article le moins cher parmi les articles applicables
         cheapestItemPrice = applicableItems.reduce((minPrice, item) => Math.min(minPrice, item.prix_unitaire), Infinity);
@@ -359,7 +359,7 @@ export const calculatePromotionDiscount = (promotion: Promotion, order: Order): 
       // Calculer pour des catégories spécifiques
       const applicableItems = order.items.filter((item: any) => category_ids.includes(item.categoria_id));
       const totalApplicableQuantity = applicableItems.reduce((sum, item) => sum + item.quantite, 0);
-      freeItemsCount = Math.floor(totalApplicableQuantity / buy_quantity) * get_quantity;
+      freeItemsCount = Math.floor(totalApplicableQuantity / (buy_quantity + get_quantity)) * get_quantity;
       if (freeItemsCount > 0) {
         // Trouver le prix de l'article le moins cher parmi les articles applicables
         cheapestItemPrice = applicableItems.reduce((minPrice, item) => Math.min(minPrice, item.prix_unitaire), Infinity);
@@ -367,10 +367,10 @@ export const calculatePromotionDiscount = (promotion: Promotion, order: Order): 
     } else {
       // Calculer pour tous les articles de la commande
       const totalQuantity = order.items.reduce((sum, item) => sum + item.quantite, 0);
-      freeItemsCount = Math.floor(totalQuantity / buy_quantity) * get_quantity;
+      freeItemsCount = Math.floor(totalQuantity / (buy_quantity + get_quantity)) * get_quantity;
       if (freeItemsCount > 0) {
         const sortedPrices = order.items.map(item => item.prix_unitaire).sort((a, b) => a - b);
-        cheapestItemPrice = sortedPrices[0];
+        cheapestItemPrice = sortedPrices.length > 0 ? sortedPrices[0] : 0;
       }
     }
 

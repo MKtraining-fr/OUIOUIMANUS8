@@ -350,7 +350,7 @@ export const calculatePromotionDiscount = (promotion: Promotion, order: Order): 
       // Calculer pour des produits spécifiques
       const applicableItems = order.items.filter(item => product_ids.includes(item.produitRef));
       const totalApplicableQuantity = applicableItems.reduce((sum, item) => sum + item.quantite, 0);
-      freeItemsCount = Math.floor(totalApplicableQuantity / (buy_quantity + get_quantity)) * get_quantity;
+      freeItemsCount = Math.floor(totalApplicableQuantity / buy_quantity) * get_quantity;
       if (freeItemsCount > 0) {
         // Trouver le prix de l'article le moins cher parmi les articles applicables
         cheapestItemPrice = applicableItems.reduce((minPrice, item) => Math.min(minPrice, item.prix_unitaire), Infinity);
@@ -359,7 +359,7 @@ export const calculatePromotionDiscount = (promotion: Promotion, order: Order): 
       // Calculer pour des catégories spécifiques
       const applicableItems = order.items.filter((item: any) => category_ids.includes(item.categoria_id));
       const totalApplicableQuantity = applicableItems.reduce((sum, item) => sum + item.quantite, 0);
-      freeItemsCount = Math.floor(totalApplicableQuantity / (buy_quantity + get_quantity)) * get_quantity;
+      freeItemsCount = Math.floor(totalApplicableQuantity / buy_quantity) * get_quantity;
       if (freeItemsCount > 0) {
         // Trouver le prix de l'article le moins cher parmi les articles applicables
         cheapestItemPrice = applicableItems.reduce((minPrice, item) => Math.min(minPrice, item.prix_unitaire), Infinity);

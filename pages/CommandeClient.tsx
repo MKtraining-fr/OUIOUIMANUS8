@@ -379,9 +379,6 @@ const OrderMenuView: React.FC<OrderMenuViewProps> = ({ onOrderSubmitted }) => {
                 appliedPromotions: updatedOrder.applied_promotions
             });
             setIsFreeShipping(isDeliveryFree);
-                deliveryFee: currentDeliveryFee,
-                appliedPromotions: updatedOrder.applied_promotions
-            });
         };
 
         calculateOrderTotals();

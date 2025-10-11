@@ -137,7 +137,8 @@ const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, selectedPr
                                         />
                                         <label htmlFor={`ingredient-${index}`} className="text-gray-700">{ingredient}</label>
                                     </div>
-                                ))}
+                                    )
+                    ))}
                             </div>
                         </div>
                     )}
@@ -601,12 +602,15 @@ const OrderMenuView: React.FC<OrderMenuViewProps> = ({ onOrderSubmitted }) => {
                         >
                             {category.nom}
                         </button>
-                    ))}
+                        )
+                        />
+                    ))
+                }
                 </div>
 
                 {/* Product Grid */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-                    {filteredProducts.map(product => (
+                    {filteredProducts.map(product => product && (
                         <ProductCardWithPromotion
                             key={product.id}
                             product={product}
@@ -726,7 +730,8 @@ const OrderMenuView: React.FC<OrderMenuViewProps> = ({ onOrderSubmitted }) => {
                                     </p>
                                 </div>
                             </div>
-                        ))}
+                            )
+                    ))}
                         {cart.length > 0 && (
                             <div className="flex items-center justify-between py-3 border-b border-gray-200 last:border-b-0">
                                 <p className="font-medium text-gray-800">{DOMICILIO_ITEM_NAME}</p>

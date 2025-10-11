@@ -563,7 +563,7 @@ const OrderMenuView: React.FC<OrderMenuViewProps> = ({ onOrderSubmitted }) => {
     };
 
     const generateWhatsAppMessage = (order: Order): string => {
-        const itemsText = order.items.map(item => `- ${item.quantite}x ${item.nom_produit} (${formatCurrencyCOP(item.prix_unitaire)})`).join("\n");
+        const itemsText = order.items.map(item => item && item.nom_produit ? `- ${item.quantite}x ${item.nom_produit} (${formatCurrencyCOP(item.prix_unitaire)})` : "> Article inconnu").join("\n");
         const totalText = `Total: ${formatCurrencyCOP(order.total)}`;
         const clientText = `Cliente: ${order.client_name} (${order.client_phone})\nDirección: ${order.client_address}`;
         const paymentText = `Método de pago: ${order.payment_method === "transferencia" ? "Transferencia" : "Efectivo"}`;
@@ -692,7 +692,7 @@ const OrderMenuView: React.FC<OrderMenuViewProps> = ({ onOrderSubmitted }) => {
                         {cart.map((item) => (
                             <div key={item.id} className="flex items-start justify-between py-4 border-b border-gray-200 last:border-b-0 bg-white rounded-lg px-3 mb-2 shadow-sm">
                                 <div className="flex-1">
-                                    <p className="font-bold text-lg text-gray-900 mb-1">{item.nom_produit}</p>
+                                    <p className="font-bold text-lg text-gray-900 mb-1">{item?.nom_produit || 'Article inconnu'}</p>
                                     {item.commentaire && (
                                         <p className="text-sm text-gray-600 italic mb-1 bg-yellow-50 p-2 rounded border-l-2 border-yellow-400">
                                             💬 {item.commentaire}

@@ -322,11 +322,10 @@ export interface Order {
   profit?: number;
   payment_method?: 'efectivo' | 'transferencia' | 'tarjeta';
   payment_receipt_url?: string;
-  clientInfo?: {
-    nom: string;
-    telephone: string;
-    adresse?: string;
-  };
+  // Champs client aplatis pour correspondre à la DB
+  client_name?: string;
+  client_phone?: string;
+  client_address?: string;
   receipt_url?: string;
   // Champs pour les promotions
   subtotal?: number; // Montant avant réduction
@@ -337,6 +336,7 @@ export interface Order {
     name: string;
     discount_amount: number;
   }[];
+  shipping_cost?: number; // Coût de la livraison, utilisé pour les promotions de livraison gratuite
 }
 
 export interface KitchenTicket extends Order {

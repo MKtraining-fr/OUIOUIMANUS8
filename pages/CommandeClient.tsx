@@ -3,11 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Product, Category, OrderItem, Order } from '../types';
 
 // Type pour les informations client
-type ClientInfo = {
-    nom: string;
-    telephone: string;
-    adresse?: string;
-};
+
 import { api } from '../services/api';
 import { formatCurrencyCOP } from '../utils/formatIntegerAmount';
 import { uploadPaymentReceipt } from '../services/cloudinary';
@@ -253,7 +249,9 @@ const OrderMenuView: React.FC<OrderMenuViewProps> = ({ onOrderSubmitted }) => {
     const [cart, setCart] = useState<OrderItem[]>([]);
     const [modalOpen, setModalOpen] = useState(false);
     const [selectedProduct, setSelectedProduct] = useState<SelectedProductState | null>(null);
-    const [clientInfo, setClientInfo] = useState<ClientInfo>({nom: '', adresse: '', telephone: ''});
+    const [clientName, setClientName] = useState<string>('');
+    const [clientPhone, setClientPhone] = useState<string>('');
+    const [clientAddress, setClientAddress] = useState<string>('');
     const [paymentMethod, setPaymentMethod] = useState<'transferencia' | 'efectivo'>('transferencia');
     const [paymentProof, setPaymentProof] = useState<File | null>(null);
     const [submitting, setSubmitting] = useState(false);
@@ -339,7 +337,10 @@ const OrderMenuView: React.FC<OrderMenuViewProps> = ({ onOrderSubmitted }) => {
                 total_discount: 0,
                 applied_promotions: [],
                 promo_code: appliedPromoCode || undefined,
-                clientInfo: clientInfo,
+                client_name: clientName,
+                client_phone: clientPhone,
+                client_address: clientAddress,
+                shipping_cost: DOMICILIO_FEE, // Assurez-vous que DOMICILIO_FEE est défini ou récupéré ailleurs
                 order_type: orderType,
                 payment_method: paymentMethod,
                 status: 'pending',
@@ -442,7 +443,10 @@ const OrderMenuView: React.FC<OrderMenuViewProps> = ({ onOrderSubmitted }) => {
             const tempOrder = {
                 id: "temp-order",
                 items: cart.filter(item => !isDeliveryFeeItem(item)),
-                clientInfo: clientInfo,
+                client_name: clientName,
+                client_phone: clientPhone,
+                client_address: clientAddress,
+                shipping_cost: DOMICILIO_FEE, // Assurez-vous que DOMICILIO_FEE est défini ou récupéré ailleurs
                 total: cart.reduce((acc, item) => acc + item.quantite * item.prix_unitaire, 0),
                 promo_code: promoCode,
                 applied_promotions: [],
@@ -476,13 +480,13 @@ const OrderMenuView: React.FC<OrderMenuViewProps> = ({ onOrderSubmitted }) => {
         e.preventDefault();
         // Pour les commandes à emporter, l'adresse n'est pas obligatoire
         const isAddressRequired = orderType === 'pedir_en_linea';
-        if (!clientInfo.nom || !clientInfo.telephone || (isAddressRequired && !clientInfo.adresse) || !paymentProof || !paymentMethod) return;
+        if (!clientName || !clientPhone || (isAddressRequired && !clientAddress) || !paymentProof || !paymentMethod) return;
         setSubmitting(true);
         try {
             let receiptUrl: string | undefined;
             if (paymentProof) {
                 receiptUrl = await uploadPaymentReceipt(paymentProof, {
-                    customerReference: clientInfo.telephone || clientInfo.nom,
+                    customerReference: clientPhone || clientName,
                 });
             }
 
@@ -557,7 +561,7 @@ const OrderMenuView: React.FC<OrderMenuViewProps> = ({ onOrderSubmitted }) => {
     const generateWhatsAppMessage = (order: Order): string => {
         const itemsText = order.items.map(item => `- ${item.quantite}x ${item.nom_produit} (${formatCurrencyCOP(item.prix_unitaire)})`).join("\n");
         const totalText = `Total: ${formatCurrencyCOP(order.total)}`;
-        const clientText = `Cliente: ${order.clientInfo?.nom} (${order.clientInfo?.telephone})\nDirección: ${order.clientInfo?.adresse}`;
+        const clientText = `Cliente: ${order.client_name} (${order.client_phone})\nDirección: ${order.client_address}`;
         const paymentText = `Método de pago: ${order.payment_method === "transferencia" ? "Transferencia" : "Efectivo"}`;
         const receiptText = order.receipt_url ? `Comprobante: ${order.receipt_url}` : "";
 
@@ -828,7 +832,7 @@ const OrderMenuView: React.FC<OrderMenuViewProps> = ({ onOrderSubmitted }) => {
                             <input
                                 type="text"
                                 id="clientName"
-                                value={clientInfo.nom}
+                                value={clientName}
                                 onChange={(e) => setClientInfo({...clientInfo, nom: e.target.value})}
                                 className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
                                 required
@@ -842,7 +846,7 @@ const OrderMenuView: React.FC<OrderMenuViewProps> = ({ onOrderSubmitted }) => {
                             <input
                                 type="tel"
                                 id="clientPhone"
-                                value={clientInfo.telephone}
+                                value={clientPhone}
                                 onChange={(e) => setClientInfo({...clientInfo, telephone: e.target.value})}
                                 className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
                                 required
@@ -857,7 +861,7 @@ const OrderMenuView: React.FC<OrderMenuViewProps> = ({ onOrderSubmitted }) => {
                                 <input
                                     type="text"
                                     id="clientAddress"
-                                    value={clientInfo.adresse}
+                                    value={clientAddress}
                                     onChange={(e) => setClientInfo({...clientInfo, adresse: e.target.value})}
                                     className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
                                     required

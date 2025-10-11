@@ -357,7 +357,7 @@ export const recordPromotionUsagesForOrder = async (order: Order): Promise<void>
     await recordPromotionUsage({
       promotion_id: appliedPromo.promotion_id,
       order_id: order.id,
-      customer_phone: order.clientInfo?.telephone,
+      customer_phone: order.client_phone,
       discount_amount: appliedPromo.discount_amount,
     });
   }

@@ -24,17 +24,7 @@ const ActivePromotionsDisplay: React.FC = () => {
 
   // Filter out promo code promotions (codes secrets)
   const visiblePromotions = promotions.filter(promo => {
-    const config = promo.config as any;
-    const conditions = promo.conditions as any[];
-    
-    // Check if it's a promo code in config
-    if (config.promo_code) return false;
-    
-    // Check if it's a promo code in conditions
-    if (conditions && conditions.some(c => c.type === 'promo_code')) return false;
-    
-    // Check if the description mentions "code promo" or "código"
-    if (promo.description && /code|código|promo code/i.test(promo.description)) return false;
+    if (promo.type === 'promo_code') return false;
     
     return true;
   });
@@ -42,32 +32,30 @@ const ActivePromotionsDisplay: React.FC = () => {
   if (loading || visiblePromotions.length === 0) return null;
 
   const getPromotionIcon = (promo: Promotion) => {
-    const config = promo.config as any;
-    if (config.applies_to === 'shipping') return <TruckIcon size={16} />;
-    if (config.discount_type === 'percentage') return <Percent size={16} />;
-    if (config.hours_of_day) return <Clock size={16} />;
-    if (config.buy_quantity) return <Gift size={16} />;
+    if (promo.type === 'free_shipping') return <TruckIcon size={16} />;
+    if (promo.type === 'percentage') return <Percent size={16} />;
+    if (promo.conditions?.time_range) return <Clock size={16} />;
+    if (promo.type === 'buy_x_get_y') return <Gift size={16} />;
     return <Tag size={16} />;
   };
 
   const getPromotionDescription = (promo: Promotion) => {
-    const config = promo.config as any;
-    const conditions = promo.conditions as any[];
+    const discount = promo.discount;
+    const conditions = promo.conditions;
 
     let description = promo.description || promo.name;
     
     // Add conditions info
-    const minAmount = conditions.find(c => c.type === 'min_order_amount');
-    if (minAmount) {
-      description += ` (Mínimo: $${minAmount.value.toLocaleString()})`;
+    if (conditions?.min_order_amount) {
+      description += ` (Mínimo: ${conditions.min_order_amount.toLocaleString()})`;
     }
 
-    if (config.hours_of_day) {
-      description += ` (${config.hours_of_day.start} - ${config.hours_of_day.end})`;
+    if (conditions?.time_range) {
+      description += ` (${conditions.time_range.start_time} - ${conditions.time_range.end_time})`;
     }
 
-    if (config.promo_code) {
-      description += ` (Código: ${config.promo_code})`;
+    if (promo.type === 'promo_code' && discount?.promo_code) {
+      description += ` (Código: ${discount.promo_code})`;
     }
 
     return description;
@@ -81,8 +69,7 @@ const ActivePromotionsDisplay: React.FC = () => {
       </h3>
       <div className="space-y-1.5">
         {visiblePromotions.map((promo) => {
-          const config = promo.config as any;
-          const bgColor = config.visuals?.badge_bg_color || '#4CAF50';
+          const bgColor = promo.visuals?.badge_bg_color || '#4CAF50';
           
           return (
             <div
@@ -95,7 +82,7 @@ const ActivePromotionsDisplay: React.FC = () => {
             >
               <div
                 className="flex items-center justify-center w-8 h-8 rounded-full mr-2 flex-shrink-0"
-                style={{ backgroundColor: bgColor, color: config.visuals?.badge_color || '#FFFFFF' }}
+                style={{ backgroundColor: bgColor, color: promo.visuals?.badge_color || '#FFFFFF' }}
               >
                 {getPromotionIcon(promo)}
               </div>

@@ -866,7 +866,7 @@ const OrderMenuView: React.FC<OrderMenuViewProps> = ({ onOrderSubmitted }) => {
                                     type="text"
                                     id="clientAddress"
                                     value={clientAddress}
-                                    onChange={(e) => setClientAddress(e.target.value);}
+                                    onChange={(e) => setClientAddress(e.target.value)}
                                     className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
                                     required
                                     placeholder="Calle, número, barrio, ciudad"

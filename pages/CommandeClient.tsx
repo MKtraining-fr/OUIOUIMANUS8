@@ -383,7 +383,7 @@ const OrderMenuView: React.FC<OrderMenuViewProps> = ({ onOrderSubmitted }) => {
         };
 
         calculateOrderTotals();
-    }, [cart, appliedPromoCode, freeShippingMinAmount, orderType, clientInfo, paymentMethod]);
+    }, [cart, appliedPromoCode, freeShippingMinAmount, orderType, clientName, clientPhone, clientAddress, paymentMethod]);
 
     const { subtotal, total, automaticPromotionsDiscount, promoCodeDiscount: currentPromoCodeDiscount, deliveryFee, appliedPromotions } = orderTotals;
 
@@ -507,7 +507,9 @@ const OrderMenuView: React.FC<OrderMenuViewProps> = ({ onOrderSubmitted }) => {
             const orderData = {
                 type: orderType,
                 items: itemsToSubmit,
-                clientInfo,
+                client_name: clientName,
+                client_phone: clientPhone,
+                client_address: clientAddress,
                 receipt_url: receiptUrl,
                 payment_method: paymentMethod,
                 promo_code: appliedPromoCode || undefined,
@@ -541,7 +543,9 @@ const OrderMenuView: React.FC<OrderMenuViewProps> = ({ onOrderSubmitted }) => {
                 deliveryFee: 0,
                 appliedPromotions: []
             });
-            setClientInfo({nom: '', adresse: '', telephone: ''});
+            setClientName('');
+            setClientPhone('');
+            setClientAddress('');
             setPaymentProof(null);
             setPaymentMethod('transferencia');
             storeActiveCustomerOrder(newOrder.id);
@@ -833,7 +837,7 @@ const OrderMenuView: React.FC<OrderMenuViewProps> = ({ onOrderSubmitted }) => {
                                 type="text"
                                 id="clientName"
                                 value={clientName}
-                                onChange={(e) => setClientInfo({...clientInfo, nom: e.target.value})}
+                                onChange={(e) => setClientName(e.target.value)}
                                 className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
                                 required
                                 placeholder="Ingresa tu nombre completo"
@@ -847,7 +851,7 @@ const OrderMenuView: React.FC<OrderMenuViewProps> = ({ onOrderSubmitted }) => {
                                 type="tel"
                                 id="clientPhone"
                                 value={clientPhone}
-                                onChange={(e) => setClientInfo({...clientInfo, telephone: e.target.value})}
+                                onChange={(e) => setClientPhone(e.target.value)}
                                 className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
                                 required
                                 placeholder="Ej: 3001234567"
@@ -862,7 +866,7 @@ const OrderMenuView: React.FC<OrderMenuViewProps> = ({ onOrderSubmitted }) => {
                                     type="text"
                                     id="clientAddress"
                                     value={clientAddress}
-                                    onChange={(e) => setClientInfo({...clientInfo, adresse: e.target.value})}
+                                    onChange={(e) => setClientAddress(e.target.value);}
                                     className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
                                     required
                                     placeholder="Calle, número, barrio, ciudad"

@@ -601,7 +601,7 @@ const OrderMenuView: React.FC<OrderMenuViewProps> = ({ onOrderSubmitted }) => {
                         >
                             {category.nom}
                         </button>
-                        )
+
                         />
                     ))
                 }

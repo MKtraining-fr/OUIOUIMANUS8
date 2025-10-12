@@ -67,10 +67,37 @@ const ActivePromotionsDisplay: React.FC = () => {
         <Gift className="mr-2" size={22} />
         Promociones Activas
       </h3>
-      <div className="space-y-1.5">
+      <div className="space-y-2">
         {visiblePromotions.map((promo) => {
           const bgColor = promo.visuals?.badge_bg_color || '#4CAF50';
+          const bannerImage = promo.visuals?.banner_image;
+          const bannerText = promo.visuals?.banner_text;
           
+          // Si une bannière d'image est disponible, l'afficher en grand
+          if (bannerImage) {
+            return (
+              <div
+                key={promo.id}
+                className="relative overflow-hidden rounded-lg shadow-md transition-transform hover:scale-[1.02]"
+              >
+                <img
+                  src={bannerImage}
+                  alt={promo.name}
+                  className="w-full h-32 object-cover"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent flex items-end p-3">
+                  <div className="text-white">
+                    <p className="font-bold text-lg drop-shadow-md">{promo.name}</p>
+                    {bannerText && (
+                      <p className="text-sm drop-shadow-md">{bannerText}</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            );
+          }
+          
+          // Sinon, afficher le format compact habituel
           return (
             <div
               key={promo.id}

@@ -141,7 +141,7 @@ const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, selectedPr
                             </div>
                         </div>
                     )}
-                    
+
                     <div className="mb-4">
                         <label htmlFor="comment" className="block font-bold text-gray-800 mb-2">Comentarios adicionales:</label>
                         <textarea
@@ -199,7 +199,6 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({ isOpen, order, on
                             </svg>
                         </button>
                     </div>
-                    
                     <p className="text-gray-600 mb-4">
                         Tu pedido ha sido enviado correctamente. Recibirás una confirmación pronto.
                     </p>
@@ -352,224 +351,159 @@ const OrderMenuView: React.FC<OrderMenuViewProps> = ({ onOrderSubmitted }) => {
 
             const totalDiscount = updatedOrder.total_discount || 0;
             const currentPromoCodeDiscount = updatedOrder.applied_promotions.find(p => p.config?.promo_code === appliedPromoCode)?.discount_amount || 0;
-            const currentAutomaticPromotionsDiscount = totalDiscount - currentPromoCodeDiscount;
+            const automaticPromotionsDiscount = totalDiscount - currentPromoCodeDiscount;
 
-            let deliveryFee = 0;
-            let isDeliveryFree = false;
-
-            // Apply DOMICILIO GRATIS logic after all other promotions
-            if (orderType === 'pedir_en_linea') {
-                // Check for 'DOMICILIO GRATIS' promotion
-                const freeDeliveryPromo = updatedOrder.applied_promotions.find(p => p.name === 'DOMICILIO GRATIS');
-                if (freeDeliveryPromo) {
-                    isDeliveryFree = true;
-                    deliveryFee = 0;
-                } else {
-                    deliveryFee = DOMICILIO_FEE;
-                }
+            let deliveryFee = orderType === 'pedir_en_linea' ? DOMICILIO_FEE : 0;
+            const freeShipping = updatedOrder.applied_promotions.some(p => p.type === 'FREE_SHIPPING');
+            if (freeShipping) {
+                deliveryFee = 0;
             }
+            setIsFreeShipping(freeShipping);
 
-            const finalTotal = updatedOrder.subtotal + deliveryFee;
+            const finalTotal = initialSubtotal - totalDiscount + deliveryFee;
 
             setOrderTotals({
-                subtotal: updatedOrder.subtotal,
+                subtotal: initialSubtotal,
                 total: finalTotal,
-                automaticPromotionsDiscount: currentAutomaticPromotionsDiscount,
+                automaticPromotionsDiscount,
                 promoCodeDiscount: currentPromoCodeDiscount,
-                deliveryFee: deliveryFee,
+                deliveryFee,
                 appliedPromotions: updatedOrder.applied_promotions
             });
-            setIsFreeShipping(isDeliveryFree);
         };
 
         calculateOrderTotals();
-    }, [cart, appliedPromoCode, freeShippingMinAmount, orderType, clientName, clientPhone, clientAddress, paymentMethod]);
+    }, [cart, appliedPromoCode, orderType, clientName, clientPhone, clientAddress, paymentMethod]);
 
-    const { subtotal, total, automaticPromotionsDiscount, promoCodeDiscount: currentPromoCodeDiscount, deliveryFee, appliedPromotions } = orderTotals;
-
-    useEffect(() => {
-        setPromoCodeDiscount(currentPromoCodeDiscount);
-    }, [currentPromoCodeDiscount]);
+    const { total, subtotal, promoCodeDiscount: currentPromoCodeDiscount, deliveryFee } = orderTotals;
 
     const handleProductClick = (product: Product) => {
-        setSelectedProduct({product});
+        const existingItem = cart.find(item => item.produitRef === product.id);
+        setSelectedProduct({ 
+            product, 
+            quantite: existingItem?.quantite, 
+            commentaire: existingItem?.commentaire, 
+            excluded_ingredients: existingItem?.excluded_ingredients 
+        });
         setModalOpen(true);
     };
 
-    const handleReorder = (order: Order) => {
-        // Filter out delivery fee items and map to new cart items
-        const itemsToAddToCart = order.items
-            .filter(item => !isDeliveryFeeItem(item)) // Exclude delivery fee
-            .map(item => ({
-                ...item,
-                id: `oi${Date.now()}-${Math.random()}` // New ID for each item
-            }));
-        setCart(itemsToAddToCart);
-    };
-
     const handleAddToCart = (item: OrderItem) => {
-        let newCart = [...cart];
-        if (item.commentaire) {
-            newCart.push({ ...item, id: `oi${Date.now()}` });
-        } else {
-            const existingIndex = newCart.findIndex(cartItem => cartItem.produitRef === item.produitRef && !cartItem.commentaire);
+        setCart(prevCart => {
+            const existingIndex = prevCart.findIndex(i => i.produitRef === item.produitRef);
             if (existingIndex > -1) {
-                newCart[existingIndex].quantite += item.quantite;
+                const newCart = [...prevCart];
+                newCart[existingIndex] = { ...newCart[existingIndex], ...item };
+                return newCart;
             } else {
-                newCart.push(item);
+                return [...prevCart, item];
             }
-        }
-        setCart(newCart);
+        });
         setModalOpen(false);
     };
-    
-    const handleQuantityChange = (itemId: string, change: number) => {
-        const itemIndex = cart.findIndex(item => item.id === itemId);
-        if (itemIndex === -1) return;
-        
-        let newCart = [...cart];
-        const newQuantity = newCart[itemIndex].quantite + change;
-        if (newQuantity <= 0) {
-            newCart.splice(itemIndex, 1);
-        } else {
-            newCart[itemIndex].quantite = newQuantity;
-        }
-        setCart(newCart);
-    };
-    
-    const handleApplyPromoCode = async () => {
-        setPromoCodeError('');
-        try {
-            const tempOrder = {
-                id: "temp-order",
-                items: cart.filter(item => !isDeliveryFeeItem(item)),
-                client_name: clientName,
-                client_phone: clientPhone,
-                client_address: clientAddress,
-                shipping_cost: DOMICILIO_FEE, // Assurez-vous que DOMICILIO_FEE est défini ou récupéré ailleurs
-                total: cart.reduce((acc, item) => acc + item.quantite * item.prix_unitaire, 0),
-                promo_code: promoCode,
-                applied_promotions: [],
-                subtotal: 0,
-                total_discount: 0,
-            };
 
-            const updatedOrder = await applyPromotionsToOrder(tempOrder);
-            
-            if (updatedOrder.total_discount > 0) {
-                setAppliedPromoCode(promoCode);
-                setPromoCodeDiscount(updatedOrder.total_discount);
-                setPromoCodeError("");
-            } else {
-                setPromoCodeError("Código de promoción inválido o no aplicable.");
+    const handleQuantityChange = (itemId: string, delta: number) => {
+        setCart(cart.map(item => {
+            if (item.id === itemId) {
+                const newQuantity = item.quantite + delta;
+                if (newQuantity <= 0) {
+                    return null; // Sera filtré plus tard
+                }
+                return { ...item, quantite: newQuantity };
             }
-        } catch (error) {
-            console.error('Error applying promo code:', error);
-            setPromoCodeError('Error al aplicar el código de promoción');
-        }
+            return item;
+        }).filter(Boolean) as OrderItem[]);
+    };
+
+    const handleReorder = (order: Order) => {
+        const itemsToReorder = order.items.filter(item => !isDeliveryFeeItem(item));
+        setCart(itemsToReorder);
+    };
+
+    const handleApplyPromoCode = async () => {
+        if (!promoCode.trim()) return;
+        setPromoCodeError('');
+        setAppliedPromoCode(promoCode);
     };
 
     const handleRemovePromoCode = () => {
-        setPromoCode('');
         setAppliedPromoCode('');
-        setPromoCodeDiscount(0);
+        setPromoCode('');
         setPromoCodeError('');
     };
 
     const handleSubmitOrder = async (e: React.FormEvent) => {
         e.preventDefault();
-        // Pour les commandes à emporter, l'adresse n'est pas obligatoire
-        const isAddressRequired = orderType === 'pedir_en_linea';
-        if (!clientName || !clientPhone || (isAddressRequired && !clientAddress) || !paymentProof || !paymentMethod) return;
         setSubmitting(true);
+
+        let receiptUrl = '';
+        if (paymentMethod === 'transferencia' && paymentProof) {
+            try {
+                receiptUrl = await uploadPaymentReceipt(paymentProof);
+            } catch (error) {
+                console.error('Error uploading receipt:', error);
+                setError('Error al subir el comprobante de pago.');
+                setSubmitting(false);
+                return;
+            }
+        }
+
+        const finalOrder: Order = {
+            id: `ord_${Date.now()}`,
+            items: cart,
+            subtotal: subtotal,
+            total: total,
+            total_discount: orderTotals.automaticPromotionsDiscount + orderTotals.promoCodeDiscount,
+            applied_promotions: orderTotals.appliedPromotions,
+            promo_code: appliedPromoCode || undefined,
+            client_name: clientName,
+            client_phone: clientPhone,
+            client_address: clientAddress,
+            shipping_cost: deliveryFee,
+            order_type: orderType,
+            payment_method: paymentMethod,
+            receipt_url: receiptUrl || undefined,
+            status: 'pending',
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+        };
+
         try {
-            let receiptUrl: string | undefined;
-            if (paymentProof) {
-                receiptUrl = await uploadPaymentReceipt(paymentProof, {
-                    customerReference: clientPhone || clientName,
-                });
-            }
-
-            // Pour les commandes à emporter, on n'ajoute pas les frais de domicilio
-            // Pour les commandes avec livraison, on ajoute les frais de domicilio (gratuit si isFreeShipping)
-            const itemsToSubmit = orderType === 'pedir_en_linea' && cart.length > 0 
-                ? [...cart, createDeliveryFeeItem(isFreeShipping)] 
-                : cart;
-
-            // Calculer le subtotal (total avant réductions et frais de livraison)
-            const subtotal = cart.reduce((sum, item) => sum + item.prix_unitaire * item.quantite, 0);
-            
-            // Calculer le total avec frais de livraison et réductions
-            const deliveryFee = orderType === 'pedir_en_linea' && !isFreeShipping ? DOMICILIO_FEE : 0;
-            const totalWithDelivery = subtotal + deliveryFee;
-            const finalTotal = Math.max(0, totalWithDelivery - promoCodeDiscount);
-
-            const orderData = {
-                type: orderType,
-                items: itemsToSubmit,
-                client_name: clientName,
-                client_phone: clientPhone,
-                client_address: clientAddress,
-                receipt_url: receiptUrl,
-                payment_method: paymentMethod,
-                promo_code: appliedPromoCode || undefined,
-                subtotal: subtotal,
-                total_discount: promoCodeDiscount,
-                total: finalTotal,
-                applied_promotions: appliedPromoCode ? [{ 
-                    promotion_id: appliedPromoCode, 
-                    name: appliedPromoCode, 
-                    discount_amount: promoCodeDiscount 
-                }] : []
-            };
-
-            // Soumettre la commande
-            const newOrder = await api.createOrder(orderData);
-            setSubmittedOrder(newOrder);
+            const submitted = await api.createOrder(finalOrder);
+            setSubmittedOrder(submitted);
             setConfirmOpen(true);
-
-            // Réinitialiser le panier et tous les états après soumission réussie
-            setCart([]);
-            setPromoCode("");
-            setAppliedPromoCode("");
-            setPromoCodeError("");
-            setPromoCodeDiscount(0);
-            setIsFreeShipping(false);
-            setOrderTotals({
-                subtotal: 0,
-                total: 0,
-                automaticPromotionsDiscount: 0,
-                promoCodeDiscount: 0,
-                deliveryFee: 0,
-                appliedPromotions: []
-            });
-            setClientName('');
-            setClientPhone('');
-            setClientAddress('');
-            setPaymentProof(null);
-            setPaymentMethod('transferencia');
-            storeActiveCustomerOrder(newOrder.id);
+            onOrderSubmitted?.(submitted);
             
-            // Notify parent component that order was submitted
-            if (onOrderSubmitted) {
-                onOrderSubmitted(newOrder);
+            // Store order in history
+            try {
+                const historyJSON = localStorage.getItem('customer-order-history');
+                const history: Order[] = historyJSON ? JSON.parse(historyJSON) : [];
+                const newHistory = [submitted, ...history].slice(0, 10); // Garder les 10 dernières commandes
+                localStorage.setItem('customer-order-history', JSON.stringify(newHistory));
+                setOrderHistory(newHistory.slice(0, 3));
+            } catch (err) {
+                console.error('Error updating order history:', err);
             }
-        } catch (err) {
-            alert('Ocurrió un error al enviar el pedido o subir el comprobante.');
-            console.error(err);
+
+        } catch (error) {
+            console.error('Error submitting order:', error);
+            setError('Error al enviar el pedido. Por favor, intenta de nuevo.');
         } finally {
             setSubmitting(false);
         }
     };
 
-    const generateWhatsAppMessage = (order: Order): string => {
-        const itemsText = order.items.map(item => item && item.nom_produit ? `- ${item.quantite}x ${item.nom_produit} (${formatCurrencyCOP(item.prix_unitaire)})` : "> Article inconnu").join("\n");
-        const totalText = `Total: ${formatCurrencyCOP(order.total)}`;
-        const clientText = `Cliente: ${order.client_name} (${order.client_phone})\nDirección: ${order.client_address}`;
-        const paymentText = `Método de pago: ${order.payment_method === "transferencia" ? "Transferencia" : "Efectivo"}`;
-        const receiptText = order.receipt_url ? `Comprobante: ${order.receipt_url}` : "";
+    const generateWhatsAppMessage = (order: Order) => {
+        const itemsText = order.items.map(item => 
+            `${item.quantite}x ${item.nom_produit} - ${formatCurrencyCOP(item.prix_unitaire * item.quantite)}`
+        ).join('\n');
+        
+        const totalText = `*Total: ${formatCurrencyCOP(order.total)}*`;
+        const clientText = `*Cliente:* ${order.client_name}\n*Teléfono:* ${order.client_phone}`;
+        const paymentText = `*Método de pago:* ${order.payment_method}`;
+        const receiptText = order.receipt_url ? `\n*Comprobante:* ${order.receipt_url}` : '';
 
-        return encodeURIComponent(
+        return (
             `¡Hola! Aquí está mi pedido:\n\n${itemsText}\n\n${totalText}\n\n${clientText}\n${paymentText}\n${receiptText}`
         );
     };
@@ -578,8 +512,6 @@ const OrderMenuView: React.FC<OrderMenuViewProps> = ({ onOrderSubmitted }) => {
         <div className="flex flex-col lg:flex-row">
             {/* Main Content */}
             <div className="flex-1 p-4 lg:p-8">
-
-
                 <h1 className="text-3xl font-bold text-gray-900 mb-6 drop-shadow-md">Realizar Pedido</h1>
 
                 {/* Active Promotions Display */}
@@ -588,8 +520,8 @@ const OrderMenuView: React.FC<OrderMenuViewProps> = ({ onOrderSubmitted }) => {
                 {/* Category Filters */}
                 <div className="flex space-x-3 mb-6 overflow-x-auto pb-2">
                     <button
-                        onClick={() => setActiveCategoryId("all")}
-                        className={`px-5 py-2 rounded-full text-sm font-bold transition-all ${activeCategoryId === "all" ? "bg-gradient-to-r from-orange-500 to-red-500 text-white shadow-lg scale-105 border-2 border-orange-600" : "bg-white text-gray-800 shadow-md hover:bg-gray-100 border-2 border-gray-300"}`}
+                        onClick={() => setActiveCategoryId('all')}
+                        className={`px-5 py-2 rounded-full text-sm font-bold transition-all ${activeCategoryId === 'all' ? 'bg-gradient-to-r from-orange-500 to-red-500 text-white shadow-lg scale-105 border-2 border-orange-600' : 'bg-white text-gray-800 shadow-md hover:bg-gray-100 border-2 border-gray-300'}`}
                     >
                         Todos
                     </button>
@@ -597,14 +529,11 @@ const OrderMenuView: React.FC<OrderMenuViewProps> = ({ onOrderSubmitted }) => {
                         <button
                             key={category.id}
                             onClick={() => setActiveCategoryId(category.id)}
-                            className={`px-5 py-2 rounded-full text-sm font-bold transition-all ${activeCategoryId === category.id ? "bg-gradient-to-r from-orange-500 to-red-500 text-white shadow-lg scale-105 border-2 border-orange-600" : "bg-white text-gray-800 shadow-md hover:bg-gray-100 border-2 border-gray-300"}`}
+                            className={`px-5 py-2 rounded-full text-sm font-bold transition-all ${activeCategoryId === category.id ? 'bg-gradient-to-r from-orange-500 to-red-500 text-white shadow-lg scale-105 border-2 border-orange-600' : 'bg-white text-gray-800 shadow-md hover:bg-gray-100 border-2 border-gray-300'}`}
                         >
                             {category.nom}
                         </button>
-
-                        />
-                    ))
-                }
+                    ))}
                 </div>
 
                 {/* Product Grid */}
@@ -703,7 +632,7 @@ const OrderMenuView: React.FC<OrderMenuViewProps> = ({ onOrderSubmitted }) => {
                                     )}
                                     {item.excluded_ingredients && item.excluded_ingredients.length > 0 && (
                                         <p className="text-sm text-red-600 mb-1 bg-red-50 p-2 rounded border-l-2 border-red-400">
-                                            🚫 Sin: {item.excluded_ingredients.join(", ")}
+                                            🚫 Sin: {item.excluded_ingredients.join(', ')}
                                         </p>
                                     )}
                                     <p className="text-base font-semibold text-brand-primary mt-2">{formatCurrencyCOP(item.prix_unitaire)}</p>
@@ -726,24 +655,26 @@ const OrderMenuView: React.FC<OrderMenuViewProps> = ({ onOrderSubmitted }) => {
                                     </div>
                                     <p className="text-sm font-semibold text-gray-700 mt-2">
                                         {formatCurrencyCOP(item.prix_unitaire * item.quantite)}
-                                    </div>
-                                ))}
-                            </div>                       {cart.length > 0 && (
-                            <div className="flex items-center justify-between py-3 border-b border-gray-200 last:border-b-0">
-                                <p className="font-medium text-gray-800">{DOMICILIO_ITEM_NAME}</p>
-                                {isFreeShipping ? (
-                                    <div className="flex items-center space-x-2">
-                                        <p className="text-sm text-gray-400 line-through">{formatCurrencyCOP(DOMICILIO_FEE)}</p>
-                                        <p className="text-sm font-bold text-green-600">GRATIS</p>
-                                    </div>
-                                ) : (
-                                    <p className="text-sm text-gray-600">{formatCurrencyCOP(DOMICILIO_FEE)}</p>
-                                )}
+                                    </p>
+                                </div>
                             </div>
-                        )}
+                        ))}
                     </div>
                 )}
 
+                {cart.length > 0 && orderType === 'pedir_en_linea' && (
+                    <div className="flex items-center justify-between py-3 border-b border-gray-200 last:border-b-0">
+                        <p className="font-medium text-gray-800">{DOMICILIO_ITEM_NAME}</p>
+                        {isFreeShipping ? (
+                            <div className="flex items-center space-x-2">
+                                <p className="text-sm text-gray-400 line-through">{formatCurrencyCOP(DOMICILIO_FEE)}</p>
+                                <p className="text-sm font-bold text-green-600">GRATIS</p>
+                            </div>
+                        ) : (
+                            <p className="text-sm text-gray-600">{formatCurrencyCOP(DOMICILIO_FEE)}</p>
+                        )}
+                    </div>
+                )}
                 <div className="mt-auto pt-4 border-t border-gray-200">
                     {/* Promo Code Input */}
                     <div className="mb-4">
@@ -757,8 +688,9 @@ const OrderMenuView: React.FC<OrderMenuViewProps> = ({ onOrderSubmitted }) => {
                                 value={promoCode}
                                 onChange={(e) => setPromoCode(e.target.value.toUpperCase())}
                                 placeholder="Ingresa tu código"
-                                className="flex-1 border border-gray-300 rounded-md shadow-sm p-2 uppercase"
+                                className="flex-1 border border-gray-300 rounded-md shadow-sm p-2 uppercase" 
                             />
+    
                             <button
                                 type="button"
                                 onClick={handleApplyPromoCode}
@@ -768,6 +700,9 @@ const OrderMenuView: React.FC<OrderMenuViewProps> = ({ onOrderSubmitted }) => {
                                 Aplicar
                             </button>
                         </div>
+                        {promoCodeError && (
+                            <p className="mt-2 text-sm text-red-600">{promoCodeError}</p>
+                        )}
                         {appliedPromoCode && (
                             <div className="mt-2 p-2 bg-green-50 border border-green-200 rounded-md flex items-center justify-between">
                                 <span className="text-sm text-green-700 font-medium">
@@ -782,14 +717,24 @@ const OrderMenuView: React.FC<OrderMenuViewProps> = ({ onOrderSubmitted }) => {
                                 </button>
                             </div>
                         )}
-                        {promoCodeError && (
-                            <p className="mt-2 text-sm text-red-600">{promoCodeError}</p>
-                        )}
                     </div>
+
+                    {/* Affichage détaillé des promotions appliquées */}
+                    {orderTotals.appliedPromotions && orderTotals.appliedPromotions.length > 0 && (
+                        <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+                            <p className="text-sm font-bold text-green-800 mb-2">🎉 Promociones aplicadas:</p>
+                            {orderTotals.appliedPromotions.map((promo, index) => (
+                                <div key={index} className="flex justify-between items-center mb-1 text-sm">
+                                    <span className="text-green-700">{promo.name}</span>
+                                    <span className="font-semibold text-green-700">- {formatCurrencyCOP(promo.discount_amount)}</span>
+                                </div>
+                            ))}
+                        </div>
+                    )}
 
                     {promoCodeDiscount > 0 && (
                         <div className="flex justify-between items-center mb-2">
-                            <p className="text-sm text-green-600">Descuento por promoción:</p>
+                            <p className="text-sm text-green-600">Descuento por código promocional:</p>
                             <p className="text-sm font-bold text-green-600">- {formatCurrencyCOP(promoCodeDiscount)}</p>
                         </div>
                     )}
@@ -797,8 +742,6 @@ const OrderMenuView: React.FC<OrderMenuViewProps> = ({ onOrderSubmitted }) => {
                         <p className="text-lg font-bold text-gray-800">Total:</p>
                         <p className="text-xl font-bold text-brand-primary">{formatCurrencyCOP(total)}</p>
                     </div>
-
-
 
                     <form onSubmit={handleSubmitOrder} className="space-y-4">
                         {/* Sélecteur de type de commande */}
@@ -812,7 +755,7 @@ const OrderMenuView: React.FC<OrderMenuViewProps> = ({ onOrderSubmitted }) => {
                                         value="pedir_en_linea"
                                         checked={orderType === 'pedir_en_linea'}
                                         onChange={() => setOrderType('pedir_en_linea')}
-                                        className="form-radio text-brand-primary"
+                                        className="form-radio text-brand-primary" 
                                     />
                                     <span className="ml-3 font-medium">🚚 Domicilio (con entrega)</span>
                                 </label>
@@ -823,7 +766,7 @@ const OrderMenuView: React.FC<OrderMenuViewProps> = ({ onOrderSubmitted }) => {
                                         value="a_emporter"
                                         checked={orderType === 'a_emporter'}
                                         onChange={() => setOrderType('a_emporter')}
-                                        className="form-radio text-brand-primary"
+                                        className="form-radio text-brand-primary" 
                                     />
                                     <span className="ml-3 font-medium">🏪 Para llevar (recoger en tienda)</span>
                                 </label>
@@ -841,9 +784,9 @@ const OrderMenuView: React.FC<OrderMenuViewProps> = ({ onOrderSubmitted }) => {
                                 onChange={(e) => setClientName(e.target.value)}
                                 className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
                                 required
-                                placeholder="Ingresa tu nombre completo"
                             />
                         </div>
+
                         <div>
                             <label htmlFor="clientPhone" className="block text-sm font-medium text-gray-700">
                                 Teléfono: <span className="text-red-500">*</span>
@@ -855,177 +798,108 @@ const OrderMenuView: React.FC<OrderMenuViewProps> = ({ onOrderSubmitted }) => {
                                 onChange={(e) => setClientPhone(e.target.value)}
                                 className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
                                 required
-                                placeholder="Ej: 3001234567"
                             />
                         </div>
+
                         {orderType === 'pedir_en_linea' && (
                             <div>
                                 <label htmlFor="clientAddress" className="block text-sm font-medium text-gray-700">
                                     Dirección: <span className="text-red-500">*</span>
                                 </label>
-                                <input
-                                    type="text"
+                                <textarea
                                     id="clientAddress"
                                     value={clientAddress}
                                     onChange={(e) => setClientAddress(e.target.value)}
                                     className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
+                                    rows={3}
                                     required
-                                    placeholder="Calle, número, barrio, ciudad"
-                                />
+                                ></textarea>
                             </div>
                         )}
+
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Método de Pago:</label>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">Método de pago:</label>
                             <div className="space-y-2">
-                                <label className="flex items-center p-3 border-2 border-brand-primary rounded-lg cursor-pointer hover:bg-brand-primary/5 transition">
+                                <label className={`flex items-center p-3 border-2 rounded-lg cursor-pointer transition ${paymentMethod === 'transferencia' ? 'border-brand-primary bg-brand-primary/5' : 'border-gray-300 hover:border-brand-primary/50'}`}>
                                     <input
                                         type="radio"
                                         name="paymentMethod"
                                         value="transferencia"
-                                        checked={paymentMethod === "transferencia"}
-                                        onChange={() => setPaymentMethod("transferencia")}
-                                        className="form-radio text-brand-primary"
+                                        checked={paymentMethod === 'transferencia'}
+                                        onChange={() => setPaymentMethod('transferencia')}
+                                        className="form-radio text-brand-primary" 
                                     />
-                                    <span className="ml-3 font-medium">Transferencia</span>
+                                    <span className="ml-3 font-medium">💰 Transferencia Bancaria</span>
                                 </label>
-                                <label className="flex items-center p-3 border-2 border-gray-300 rounded-lg opacity-50 cursor-not-allowed bg-gray-100">
+                                <label className={`flex items-center p-3 border-2 rounded-lg cursor-pointer transition ${paymentMethod === 'efectivo' ? 'border-brand-primary bg-brand-primary/5' : 'border-gray-300 hover:border-brand-primary/50'}`}>
                                     <input
                                         type="radio"
                                         name="paymentMethod"
                                         value="efectivo"
-                                        disabled
-                                        className="form-radio"
+                                        checked={paymentMethod === 'efectivo'}
+                                        onChange={() => setPaymentMethod('efectivo')}
+                                        className="form-radio text-brand-primary" 
                                     />
-                                    <span className="ml-3 text-gray-500">Efectivo <span className="text-xs">(no disponible por el momento)</span></span>
+                                    <span className="ml-3 font-medium">💵 Efectivo</span>
                                 </label>
                             </div>
-                            <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                                <p className="text-sm font-medium text-blue-800">
-                                    <span className="font-bold">Nequi / BRE-B:</span> 3238090562
-                                </p>
-                            </div>
                         </div>
-                        {paymentMethod === "transferencia" && (
+
+                        {paymentMethod === 'transferencia' && (
                             <div>
-                                <label htmlFor="paymentProof" className="block text-sm font-medium text-gray-700 mb-2">
-                                    Comprobante de Pago: <span className="text-red-500">*</span>
+                                <label htmlFor="paymentProof" className="block text-sm font-medium text-gray-700">
+                                    Comprobante de pago:
                                 </label>
                                 <input
                                     type="file"
                                     id="paymentProof"
-                                    accept="image/*"
                                     onChange={(e) => setPaymentProof(e.target.files ? e.target.files[0] : null)}
-                                    className="mt-1 block w-full text-sm text-gray-800 font-medium
-                                        file:mr-4 file:py-3 file:px-6 
-                                        file:rounded-lg file:border-2 file:border-brand-primary
-                                        file:text-sm file:font-bold 
-                                        file:bg-brand-primary file:text-white 
-                                        hover:file:bg-brand-primary-dark hover:file:shadow-lg
-                                        file:transition-all file:cursor-pointer
-                                        border-2 border-gray-300 rounded-lg p-2"
+                                    className="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                                    accept="image/*,application/pdf"
                                     required
                                 />
-                                {!paymentProof && (
-                                    <p className="mt-2 text-xs text-red-600 font-medium">
-                                        * El comprobante de pago es obligatorio para confirmar tu pedido
-                                    </p>
-                                )}
                             </div>
                         )}
+
                         <button
                             type="submit"
-                            className="w-full bg-green-500 text-white font-bold py-3 px-4 rounded-lg hover:bg-green-600 transition disabled:opacity-50 disabled:cursor-not-allowed shadow-md"
-                            disabled={submitting || cart.length === 0 || (paymentMethod === "transferencia" && !paymentProof)}
+                            disabled={submitting || cart.length === 0 || (paymentMethod === 'transferencia' && !paymentProof)}
+                            className="w-full bg-gradient-to-r from-blue-500 to-indigo-600 text-white font-bold py-3 px-4 rounded-lg hover:from-blue-600 hover:to-indigo-700 transition-all shadow-lg transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                            {submitting ? "Enviando..." : "Confirmar Pedido"}
+                            {submitting ? 'Enviando pedido...' : 'Confirmar Pedido'}
                         </button>
-                        {paymentMethod === "transferencia" && !paymentProof && cart.length > 0 && (
-                            <p className="text-center text-sm text-red-600 font-medium mt-2">
-                                Debes subir el comprobante de pago para confirmar tu pedido
-                            </p>
-                        )}
                     </form>
                 </div>
             </div>
 
-            <ProductModal
-                isOpen={modalOpen}
-                onClose={() => setModalOpen(false)}
-                selectedProduct={selectedProduct}
-                onAddToCart={handleAddToCart}
-            />
-
-            <OrderConfirmationModal
-                isOpen={confirmOpen}
-                order={submittedOrder}
-                whatsappNumber={siteContent?.whatsappNumber || '573238090562'}
-            />
-        </div>
-    );
-};
-
-// Main wrapper component that handles order tracking
-const CommandeClient: React.FC = () => {
-    const navigate = useNavigate();
-    const [activeOrderId, setActiveOrderId] = useState<string | null>(() => {
-        const order = getActiveCustomerOrder();
-        return order ? order.orderId : null;
-    });
-    const { content: siteContent } = useSiteContent();
-
-    const handleOrderSubmitted = (order: Order) => {
-        setActiveOrderId(order.id);
-    };
-
-    const handleNewOrder = () => {
-        clearActiveCustomerOrder();
-        setActiveOrderId(null);
-    };
-
-    // Create Hero background style for the entire page
-    const heroBackgroundStyle = siteContent 
-        ? createHeroBackgroundStyle(siteContent.hero.style, siteContent.hero.backgroundImage)
-        : {};
-
-    return (
-        <div className="min-h-screen" style={heroBackgroundStyle}>
-            {/* Header with navigation - always visible */}
-            <header className="bg-white/90 backdrop-blur shadow-md p-4 sticky top-0 z-40">
-                <div className="container mx-auto flex justify-between items-center">
-                    <div className="flex items-center gap-3">
-                        {siteContent?.navigation.brandLogo && (
-                            <img
-                                src={siteContent.navigation.brandLogo}
-                                alt={`Logo ${siteContent.navigation.brand}`}
-                                className="h-10 w-10 rounded-full object-cover"
-                            />
-                        )}
-                        <span className="text-2xl font-bold text-gray-800">
-                            {siteContent?.navigation.brand || 'OUIOUITACOS'}
-                        </span>
-                    </div>
-                    <button
-                        onClick={() => navigate('/')}
-                        className="flex items-center gap-2 text-sm font-medium text-gray-700 hover:text-gray-900 transition"
-                    >
-                        <ArrowLeft size={16}/> Volver al inicio
-                    </button>
-                </div>
-            </header>
-
-            {/* Main content area */}
-            {activeOrderId ? (
-                <CustomerOrderTracker 
-                    orderId={activeOrderId} 
-                    onNewOrderClick={handleNewOrder} 
-                    variant="page" 
+            {selectedProduct && (
+                <ProductModal
+                    isOpen={modalOpen}
+                    onClose={() => setModalOpen(false)}
+                    selectedProduct={selectedProduct}
+                    onAddToCart={handleAddToCart}
                 />
-            ) : (
-                <OrderMenuView onOrderSubmitted={handleOrderSubmitted} />
+            )}
+
+            {submittedOrder && (
+                <ConfirmationModal
+                    isOpen={confirmOpen}
+                    order={submittedOrder}
+                    onClose={() => {
+                        setConfirmOpen(false);
+                        setCart([]);
+                        setClientName('');
+                        setClientPhone('');
+                        setClientAddress('');
+                        setPaymentMethod('transferencia');
+                        setPaymentProof(null);
+                        setAppliedPromoCode('');
+                        setPromoCodeDiscount(0);
+                    }}
+                />
             )}
         </div>
     );
 };
 
-export default CommandeClient;
-
+export default OrderMenuView;

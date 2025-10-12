@@ -90,18 +90,40 @@ const calculateBuyXGetYDiscount = (order: Order, discount: PromotionDiscount): n
   const config = discount.buy_x_get_y_config;
   if (!config) return 0;
 
-  const applicableItems = order.items.filter(item => 
-    (config.product_ids && config.product_ids.includes(item.produitRef))
-    // La logique de catégorie peut être ajoutée si nécessaire
-  );
+  let totalDiscount = 0;
 
-  const totalQuantity = applicableItems.reduce((acc, item) => acc + item.quantite, 0);
-  if (totalQuantity < config.buy_quantity + config.get_quantity) return 0;
+  // Group items by productRef to handle identical products
+  const groupedItems = order.items.reduce((acc, item) => {
+    if (!acc[item.produitRef]) {
+      acc[item.produitRef] = [];
+    }
+    acc[item.produitRef].push(item);
+    return acc;
+  }, {} as { [key: string]: OrderItem[] });
 
-  const numberOfDiscounts = Math.floor(totalQuantity / (config.buy_quantity + config.get_quantity));
-  const itemsToDiscount = applicableItems.sort((a, b) => a.prix_unitaire - b.prix_unitaire).slice(0, numberOfDiscounts * config.get_quantity);
-  
-  return itemsToDiscount.reduce((acc, item) => acc + item.prix_unitaire, 0);
+  for (const produitRef in groupedItems) {
+    const items = groupedItems[produitRef];
+    const totalQuantity = items.reduce((acc, item) => acc + item.quantite, 0);
+
+    // Check if this product is part of the 2x1 configuration
+    if (config.product_ids && config.product_ids.includes(produitRef)) {
+      if (totalQuantity >= config.buy_quantity + config.get_quantity) {
+        const numberOfSets = Math.floor(totalQuantity / (config.buy_quantity + config.get_quantity));
+        // For 2x1, config.buy_quantity = 2, config.get_quantity = 1
+        // The discount is the price of one item for each set
+        // We need to find the cheapest item in the set to give as discount
+        const sortedItems = items.sort((a, b) => a.prix_unitaire - b.prix_unitaire);
+        
+        for (let i = 0; i < numberOfSets; i++) {
+          // Ensure there are enough items to apply the discount
+          if (sortedItems.length > (i * (config.buy_quantity + config.get_quantity)) + config.buy_quantity) {
+            totalDiscount += sortedItems[(i * (config.buy_quantity + config.get_quantity)) + config.buy_quantity].prix_unitaire;
+          }
+        }
+      }
+    }
+  }
+  return totalDiscount;
 };
 
 const calculateFreeShippingDiscount = (order: Order): number => {

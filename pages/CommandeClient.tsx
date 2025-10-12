@@ -493,21 +493,6 @@ const OrderMenuView: React.FC<OrderMenuViewProps> = ({ onOrderSubmitted }) => {
         }
     };
 
-    const generateWhatsAppMessage = (order: Order) => {
-        const itemsText = order.items.map(item => 
-            `${item.quantite}x ${item.nom_produit} - ${formatCurrencyCOP(item.prix_unitaire * item.quantite)}`
-        ).join('\n');
-        
-        const totalText = `*Total: ${formatCurrencyCOP(order.total)}*`;
-        const clientText = `*Cliente:* ${order.client_name}\n*Teléfono:* ${order.client_phone}`;
-        const paymentText = `*Método de pago:* ${order.payment_method}`;
-        const receiptText = order.receipt_url ? `\n*Comprobante:* ${order.receipt_url}` : '';
-
-        return (
-            `¡Hola! Aquí está mi pedido:\n\n${itemsText}\n\n${totalText}\n\n${clientText}\n${paymentText}\n${receiptText}`
-        );
-    };
-
     return (
         <div className="flex flex-col lg:flex-row">
             {/* Main Content */}

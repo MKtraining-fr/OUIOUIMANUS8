@@ -34,7 +34,7 @@ const useProductPromotions = (product: Product | null) => {
           if (!isPromotionValidAtTime(promotion)) return false;
 
           const config = promotion.config || {};
-          const conditions = promotion.conditions || [];
+          const conditions = Array.isArray(promotion.conditions) ? promotion.conditions : [];
 
           // Si pas de conditions spécifiques de produit/catégorie, la promotion n'est pas applicable à un produit individuel
           if (!config.product_ids && !config.category_ids && conditions.length === 0) {
@@ -56,17 +56,21 @@ const useProductPromotions = (product: Product | null) => {
           }
 
           // Vérifier les conditions du tableau conditions
-          const isApplicable = conditions.some(condition => {
-            if (condition.type === 'specific_product' && Array.isArray(condition.value)) {
-              return condition.value.includes(product.id);
-            }
-            if (condition.type === 'specific_category' && Array.isArray(condition.value)) {
-              return condition.value.includes(product.categoria_id);
-            }
-            return false;
-          });
+          if (conditions.length > 0) {
+            const isApplicable = conditions.some(condition => {
+              if (condition.type === 'specific_product' && Array.isArray(condition.value)) {
+                return condition.value.includes(product.id);
+              }
+              if (condition.type === 'specific_category' && Array.isArray(condition.value)) {
+                return condition.value.includes(product.categoria_id);
+              }
+              return false;
+            });
+            
+            return isApplicable;
+          }
 
-          return isApplicable;
+          return false;
         });
 
         // Trier par priorité (plus élevée en premier)

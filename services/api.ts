@@ -2242,9 +2242,9 @@ export const api = {
       estado_cocina: 'en_attente',
       payment_status: 'pending',
       date_creation: new Date().toISOString(),
-      total: order.total || 0,
-      subtotal: order.subtotal || 0,
-      total_discount: order.total_discount || 0,
+      total: order.total ?? 0,
+      subtotal: order.subtotal ?? 0,
+      total_discount: order.total_discount ?? 0,
       promo_code: order.promo_code || null,
       applied_promotions: order.applied_promotions ? JSON.stringify(order.applied_promotions) : null,
       payment_method: order.payment_method || null,
@@ -2258,7 +2258,32 @@ export const api = {
     const orderResponse = await supabase
       .from('orders')
       .insert(orderPayload)
-      .select('*')
+      .select(`
+        id,
+        type,
+        table_id,
+        table_nom,
+        couverts,
+        statut,
+        estado_cocina,
+        date_creation,
+        date_envoi_cuisine,
+        date_listo_cuisine,
+        date_servido,
+        payment_status,
+        total,
+        profit,
+        payment_method,
+        payment_receipt_url,
+        client_nom,
+        client_telephone,
+        client_adresse,
+        receipt_url,
+        subtotal,
+        total_discount,
+        promo_code,
+        applied_promotions
+      `)
       .single();
 
     const insertedOrder = unwrap<SupabaseOrderRow>(orderResponse as SupabaseResponse<SupabaseOrderRow>);

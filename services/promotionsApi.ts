@@ -210,13 +210,20 @@ export const applyPromotionsToOrder = async (order: Order): Promise<Order> => {
     return order; // Retourne la commande originale en cas d'erreur
   }
 
-  const applicablePromotions = activePromotions
-    .filter(promo => promo.type !== 'promo_code' && isPromotionApplicableToOrder(promo, mutableOrder))
+  // Séparer les promotions en deux groupes
+  // Groupe 1: Promotions qui s'appliquent en premier (2x1, happy_hour, codes promo)
+  // Groupe 2: Promotions basées sur le total de la commande (percentage, fixed_amount, threshold, free_shipping)
+  const firstPassTypes: PromotionType[] = ['buy_x_get_y', 'happy_hour', 'promo_code'];
+  const secondPassTypes: PromotionType[] = ['percentage', 'fixed_amount', 'threshold', 'free_shipping'];
+
+  const firstPassPromotions = activePromotions
+    .filter(promo => firstPassTypes.includes(promo.type) && promo.type !== 'promo_code' && isPromotionApplicableToOrder(promo, mutableOrder))
     .sort((a, b) => b.priority - a.priority);
 
   let currentSubtotal = mutableOrder.subtotal!;
 
-  for (const promo of applicablePromotions) {
+  // Passe 1: Appliquer les promotions de type 2x1, happy hour, etc.
+  for (const promo of firstPassPromotions) {
     const discount = calculatePromotionDiscount(promo, mutableOrder);
     if (discount > 0) {
       const cappedDiscount = Math.min(discount, currentSubtotal);
@@ -230,7 +237,7 @@ export const applyPromotionsToOrder = async (order: Order): Promise<Order> => {
     }
   }
 
-  // Gestion du code promo s'il y en a un
+  // Gestion du code promo s'il y en a un (appliqué après la passe 1)
   if (order.promo_code) {
     const promoCodePromotion = await fetchPromotionByCode(order.promo_code);
 
@@ -246,6 +253,28 @@ export const applyPromotionsToOrder = async (order: Order): Promise<Order> => {
           discount_amount: cappedDiscount,
         });
       }
+    }
+  }
+
+  // Mettre à jour le sous-total de la commande pour la passe 2
+  mutableOrder.subtotal = currentSubtotal;
+
+  // Passe 2: Appliquer les promotions basées sur le total de la commande
+  const secondPassPromotions = activePromotions
+    .filter(promo => secondPassTypes.includes(promo.type) && isPromotionApplicableToOrder(promo, mutableOrder))
+    .sort((a, b) => b.priority - a.priority);
+
+  for (const promo of secondPassPromotions) {
+    const discount = calculatePromotionDiscount(promo, mutableOrder);
+    if (discount > 0) {
+      const cappedDiscount = Math.min(discount, currentSubtotal);
+      currentSubtotal -= cappedDiscount;
+      mutableOrder.total_discount! += cappedDiscount;
+      mutableOrder.applied_promotions!.push({
+        promotion_id: promo.id,
+        name: promo.name,
+        discount_amount: cappedDiscount,
+      });
     }
   }
 

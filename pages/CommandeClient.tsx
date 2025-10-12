@@ -400,8 +400,12 @@ const OrderMenuView: React.FC<OrderMenuViewProps> = ({ onOrderSubmitted }) => {
             updated_at: new Date().toISOString(),
         };
 
+        console.log('finalOrder.total avant createOrder:', finalOrder.total);
+        console.log('orderTotals:', orderTotals);
+
         try {
             const submitted = await api.createOrder(finalOrder);
+            console.log('submitted.total après createOrder:', submitted.total);
             setSubmittedOrder(submitted);
             setConfirmOpen(true);
             onOrderSubmitted?.(submitted);

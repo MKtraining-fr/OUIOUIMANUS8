@@ -2297,7 +2297,7 @@ export const api = {
         nom_produit: item.nom_produit,
         prix_unitaire: item.prix_unitaire,
         quantite: item.quantite,
-        excluded_ingredients: item.excluded_ingredients || null,
+        excluded_ingredients: item.excluded_ingredients || [],
         commentaire: item.commentaire || null,
         estado: 'en_attente',
       }));

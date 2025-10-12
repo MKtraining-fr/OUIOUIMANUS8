@@ -155,7 +155,7 @@ export const applyPromotionsToOrder = async (order: Order): Promise<Order> => {
   }
 
   const applicablePromotions = activePromotions
-    .filter(promo => isPromotionApplicableToOrder(promo, mutableOrder))
+    .filter(promo => promo.type !== 'promo_code' && isPromotionApplicableToOrder(promo, mutableOrder))
     .sort((a, b) => b.priority - a.priority);
 
   let currentSubtotal = mutableOrder.subtotal!;

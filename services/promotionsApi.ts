@@ -66,11 +66,11 @@ const calculatePercentageDiscount = (order: Order, discount: PromotionDiscount):
   
   if (discount.applies_to === 'total') {
     applicableAmount = orderSubtotal;
-  } else if (discount.applies_to === 'products' && discount.product_ids) {
+  } else if (discount.applies_to === 'products' && discount.product_ids && discount.product_ids.length > 0) {
     applicableAmount = order.items
       .filter(item => discount.product_ids?.includes(item.produitRef))
       .reduce((acc, item) => acc + item.prix_unitaire * item.quantite, 0);
-  } else if (discount.applies_to === 'categories' && discount.category_ids) {
+  } else if (discount.applies_to === 'categories' && discount.category_ids && discount.category_ids.length > 0) {
     // La logique de catégorie nécessite que les produits aient une référence de catégorie
     // applicableAmount = ...
   }

@@ -73,6 +73,22 @@ const PromotionModal: React.FC<PromotionModalProps> = ({ isOpen, onClose, onSave
     setLoading(true);
     setError(null);
 
+    // Validation de la valeur de réduction
+    if (type !== 'free_shipping' && (!discount.value || discount.value <= 0)) {
+      setError('La valeur de la réduction doit être supérieure à 0');
+      setLoading(false);
+      setActiveTab('discount');
+      return;
+    }
+
+    // Validation du nom
+    if (!name || name.trim() === '') {
+      setError('Le nom de la promotion est obligatoire');
+      setLoading(false);
+      setActiveTab('general');
+      return;
+    }
+
     try {
       if (promotion) {
         // Mise à jour d'une promotion existante

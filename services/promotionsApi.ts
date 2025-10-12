@@ -55,6 +55,18 @@ const isPromotionApplicableToOrder = (promotion: Promotion, order: Order): boole
   if (!isPromotionActive(promotion)) return false;
   if (!checkTimeAndDay(promotion.conditions)) return false;
   if (!checkOrderConditions(order, promotion.conditions)) return false;
+
+  if (promotion.type === 'buy_x_get_y') {
+    const config = promotion.discount.buy_x_get_y_config;
+    if (!config || !config.product_ids) return false;
+
+    const totalQuantity = order.items
+      .filter(item => config.product_ids.includes(item.produitRef))
+      .reduce((acc, item) => acc + item.quantite, 0);
+
+    return totalQuantity >= 2;
+  }
+
   return true;
 };
 

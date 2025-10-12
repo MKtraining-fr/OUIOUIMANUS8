@@ -33,7 +33,7 @@ const useProductPromotions = (product: Product | null) => {
           if (!isPromotionCurrentlyValid(promotion)) return false;
           if (!isPromotionValidAtTime(promotion)) return false;
 
-          const config = promotion.config;
+          const config = promotion.config || {};
           const conditions = promotion.conditions || [];
 
           // Si pas de conditions spécifiques de produit/catégorie, la promotion n'est pas applicable à un produit individuel
@@ -42,14 +42,14 @@ const useProductPromotions = (product: Product | null) => {
           }
 
           // Vérifier les produits spécifiques dans config
-          if (config.product_ids && config.product_ids.length > 0) {
+          if (config.product_ids && Array.isArray(config.product_ids) && config.product_ids.length > 0) {
             if (config.product_ids.includes(product.id)) {
               return true;
             }
           }
 
           // Vérifier les catégories spécifiques dans config
-          if (config.category_ids && config.category_ids.length > 0) {
+          if (config.category_ids && Array.isArray(config.category_ids) && config.category_ids.length > 0) {
             if (config.category_ids.includes(product.categoria_id)) {
               return true;
             }

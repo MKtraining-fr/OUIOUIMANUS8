@@ -127,7 +127,27 @@ const calculatePromotionDiscount = (promotion: Promotion, order: Order): number 
       return calculateBuyXGetYDiscount(order, promotion.discount);
     case 'free_shipping':
       return calculateFreeShippingDiscount(order);
-    // Les autres types de promotions (free_product, combo, threshold, happy_hour) 
+    case 'threshold': // Promotions de type palier (seuil)
+      // Pour les promotions de type threshold, on applique la réduction si le montant minimum est atteint
+      // La vérification du montant minimum est déjà faite dans isPromotionApplicableToOrder
+      // On applique donc la réduction selon le type (pourcentage ou montant fixe)
+      if (promotion.discount.discount_type === 'percentage') {
+        return calculatePercentageDiscount(order, promotion.discount);
+      } else if (promotion.discount.discount_type === 'fixed_amount') {
+        return calculateFixedAmountDiscount(order, promotion.discount);
+      }
+      return 0;
+    case 'happy_hour': // Promotions happy hour
+      // Pour les happy hours, on applique la réduction si l'heure actuelle est dans la plage
+      // La vérification de l'heure est déjà faite dans checkTimeAndDay
+      // On applique donc la réduction selon le type (pourcentage ou montant fixe)
+      if (promotion.discount.discount_type === 'percentage') {
+        return calculatePercentageDiscount(order, promotion.discount);
+      } else if (promotion.discount.discount_type === 'fixed_amount') {
+        return calculateFixedAmountDiscount(order, promotion.discount);
+      }
+      return 0;
+    // Les autres types de promotions (free_product, combo) 
     // nécessitent une logique plus complexe qui sera ajoutée ultérieurement.
     default:
       return 0;

@@ -2289,6 +2289,7 @@ export const api = {
     const insertedOrder = unwrap<SupabaseOrderRow>(orderResponse as SupabaseResponse<SupabaseOrderRow>);
 
     // Insérer les items de la commande
+    const insertedItems: OrderItem[] = [];
     if (order.items && order.items.length > 0) {
       const itemsPayload = order.items.map(item => ({
         order_id: insertedOrder.id,
@@ -2301,13 +2302,43 @@ export const api = {
         estado: 'en_attente',
       }));
 
-      await supabase.from('order_items').insert(itemsPayload);
+      const itemsResponse = await supabase.from('order_items').insert(itemsPayload).select('*');
+      const items = unwrap<SupabaseOrderItemRow[]>(itemsResponse as SupabaseResponse<SupabaseOrderItemRow[]>);
+      insertedItems.push(...items.map(mapOrderItemRow));
     }
 
-    // Récupérer la commande complète avec les items
-    const finalOrder = await fetchOrderById(insertedOrder.id);
-    if (!finalOrder) {
-      throw new Error('Order not found after creation');
+    // Construire l'objet Order final directement à partir des données insérées
+    const finalOrder: Order = {
+      id: insertedOrder.id,
+      type: insertedOrder.type,
+      table_id: insertedOrder.table_id ?? undefined,
+      table_nom: insertedOrder.table_nom ?? undefined,
+      couverts: insertedOrder.couverts ?? 0,
+      statut: insertedOrder.statut,
+      estado_cocina: insertedOrder.estado_cocina,
+      date_creation: toTimestamp(insertedOrder.date_creation) ?? Date.now(),
+      date_envoi_cuisine: toTimestamp(insertedOrder.date_envoi_cuisine),
+      date_listo_cuisine: toTimestamp(insertedOrder.date_listo_cuisine),
+      date_servido: toTimestamp(insertedOrder.date_servido),
+      payment_status: insertedOrder.payment_status,
+      items: insertedItems,
+      total: toNumber(insertedOrder.total) ?? 0,
+      profit: toNumber(insertedOrder.profit),
+      payment_method: insertedOrder.payment_method ?? undefined,
+      payment_receipt_url: insertedOrder.payment_receipt_url ?? undefined,
+      receipt_url: insertedOrder.receipt_url ?? undefined,
+      subtotal: toNumber(insertedOrder.subtotal),
+      total_discount: toNumber(insertedOrder.total_discount),
+      promo_code: insertedOrder.promo_code ?? undefined,
+      applied_promotions: insertedOrder.applied_promotions ? (typeof insertedOrder.applied_promotions === 'string' ? JSON.parse(insertedOrder.applied_promotions) : insertedOrder.applied_promotions) : undefined,
+    };
+
+    if (insertedOrder.client_nom || insertedOrder.client_telephone || insertedOrder.client_adresse) {
+      finalOrder.clientInfo = {
+        nom: insertedOrder.client_nom ?? '',
+        telephone: insertedOrder.client_telephone ?? '',
+        adresse: insertedOrder.client_adresse ?? undefined,
+      };
     }
 
     publishOrderChange({ includeNotifications: true });

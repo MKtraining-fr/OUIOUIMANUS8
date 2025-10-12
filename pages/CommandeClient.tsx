@@ -799,7 +799,7 @@ const OrderMenuView: React.FC<OrderMenuViewProps> = ({ onOrderSubmitted }) => {
             )}
 
             {submittedOrder && (
-                <ConfirmationModal
+                <OrderConfirmationModal
                     isOpen={confirmOpen}
                     order={submittedOrder}
                     onClose={() => {

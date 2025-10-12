@@ -2233,6 +2233,62 @@ export const api = {
     const rows = unwrap<SupabaseOrderRow[]>(response as SupabaseResponse<SupabaseOrderRow[]>);
     return rows.map(mapOrderRow);
   },
+
+  createOrder: async (order: Partial<Order>): Promise<Order> => {
+    // Préparer les données de la commande
+    const orderPayload: Record<string, unknown> = {
+      type: order.order_type || 'para_llevar',
+      statut: order.status || 'pending',
+      estado_cocina: 'en_attente',
+      payment_status: 'pending',
+      date_creation: new Date().toISOString(),
+      total: order.total || 0,
+      subtotal: order.subtotal || 0,
+      total_discount: order.total_discount || 0,
+      promo_code: order.promo_code || null,
+      applied_promotions: order.applied_promotions ? JSON.stringify(order.applied_promotions) : null,
+      payment_method: order.payment_method || null,
+      payment_receipt_url: order.receipt_url || null,
+      client_nom: order.client_name || null,
+      client_telephone: order.client_phone || null,
+      client_adresse: order.client_address || null,
+    };
+
+    // Insérer la commande dans la base de données
+    const orderResponse = await supabase
+      .from('orders')
+      .insert(orderPayload)
+      .select('*')
+      .single();
+
+    const insertedOrder = unwrap<SupabaseOrderRow>(orderResponse as SupabaseResponse<SupabaseOrderRow>);
+
+    // Insérer les items de la commande
+    if (order.items && order.items.length > 0) {
+      const itemsPayload = order.items.map(item => ({
+        order_id: insertedOrder.id,
+        produit_id: item.produitRef,
+        nom_produit: item.nom_produit,
+        prix_unitaire: item.prix_unitaire,
+        quantite: item.quantite,
+        excluded_ingredients: item.excluded_ingredients || null,
+        commentaire: item.commentaire || null,
+        estado: 'en_attente',
+      }));
+
+      await supabase.from('order_items').insert(itemsPayload);
+    }
+
+    // Récupérer la commande complète avec les items
+    const finalOrder = await fetchOrderById(insertedOrder.id);
+    if (!finalOrder) {
+      throw new Error('Order not found after creation');
+    }
+
+    publishOrderChange({ includeNotifications: true });
+    return finalOrder;
+  },
+
   logins: {
     fetchSince: fetchRoleLoginsSince,
     clearBefore: clearRoleLoginsBefore,

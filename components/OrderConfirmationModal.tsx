@@ -27,15 +27,47 @@ const OrderConfirmationModal: React.FC<OrderConfirmationModalProps> = ({
       .map(item => `- ${item.quantite}x ${item.nom_produit} (${formatCurrencyCOP(item.prix_unitaire)})`)
       .join('\n');
     
-    const totalText = `Total: ${formatCurrencyCOP(order.total)}`;
-    const clientText = `Cliente: ${order.clientInfo?.nom} (${order.clientInfo?.telephone})\nDirección: ${order.clientInfo?.adresse}`;
-    const paymentText = `Método de pago: ${order.payment_method === 'transferencia' ? 'Transferencia' : 'Efectivo'}`;
-    const receiptText = order.receipt_url ? `Comprobante: ${order.receipt_url}` : '';
-    const orderIdText = `Pedido #${order.id.slice(-6)}`;
+    let messageParts: string[] = [];
 
-    return encodeURIComponent(
-      `¡Hola! Aquí está mi pedido:\n\n${orderIdText}\n\n${itemsText}\n\n${totalText}\n\n${clientText}\n${paymentText}\n${receiptText}`
-    );
+    messageParts.push(`¡Hola! Aquí está mi pedido:\n\nPedido #${order.id.slice(-6)}`);
+
+    messageParts.push(`\n\nProductos:\n${itemsText}`);
+
+    if (order.subtotal !== undefined) {
+      messageParts.push(`\nSous-total: ${formatCurrencyCOP(order.subtotal)}`);
+    }
+
+    if (order.total_discount && order.total_discount > 0) {
+      messageParts.push(`Réduction totale: - ${formatCurrencyCOP(order.total_discount)}`);
+    }
+
+    if (order.applied_promotions && order.applied_promotions.length > 0) {
+      messageParts.push(`\nPromotions appliquées:`);
+      order.applied_promotions.forEach(promo => {
+        messageParts.push(`- ${promo.name}: - ${formatCurrencyCOP(promo.discount_amount)}`);
+      });
+    }
+
+    if (order.shipping_cost !== undefined) {
+      if (order.shipping_cost > 0) {
+        messageParts.push(`Frais de livraison: ${formatCurrencyCOP(order.shipping_cost)}`);
+      } else if (order.applied_promotions?.some(p => p.type === 'FREE_SHIPPING')) {
+        messageParts.push(`Livraison gratuite: ${formatCurrencyCOP(0)}`);
+      }
+    }
+
+    messageParts.push(`\nTotal: ${formatCurrencyCOP(order.total)}`);
+
+    messageParts.push(`\n\nCliente: ${order.clientInfo?.nom} (${order.clientInfo?.telephone})`);
+    if (order.clientInfo?.adresse) {
+      messageParts.push(`Dirección: ${order.clientInfo?.adresse}`);
+    }
+    messageParts.push(`Método de pago: ${order.payment_method === 'transferencia' ? 'Transferencia' : 'Efectivo'}`);
+    if (order.receipt_url) {
+      messageParts.push(`Comprobante: ${order.receipt_url}`);
+    }
+
+    return encodeURIComponent(messageParts.join('\n'));
   };
 
   const handleWhatsAppClick = () => {
@@ -59,9 +91,56 @@ const OrderConfirmationModal: React.FC<OrderConfirmationModalProps> = ({
         </div>
 
         <div className="p-6 text-center">
-          <p className="text-gray-700 mb-6">
-            Total: <span className="font-bold text-2xl text-green-600">{formatCurrencyCOP(order.total)}</span>
-          </p>
+          <div className="p-6 text-left">
+            <h3 className="text-lg font-bold text-gray-800 mb-4">Détails de la commande:</h3>
+            <div className="space-y-2">
+              {order.items.filter(item => !item.nom_produit?.toLowerCase().includes('domicilio')).map((item, index) => (
+                <div key={index} className="flex justify-between items-center text-gray-700">
+                  <span>{item.quantite}x {item.nom_produit}</span>
+                  <span>{formatCurrencyCOP(item.quantite * item.prix_unitaire)}</span>
+                </div>
+              ))}
+              {order.subtotal !== undefined && (
+                <div className="flex justify-between items-center text-gray-700 border-t pt-2 mt-2">
+                  <span>Sous-total:</span>
+                  <span>{formatCurrencyCOP(order.subtotal)}</span>
+                </div>
+              )}
+              {order.total_discount && order.total_discount > 0 && (
+                <div className="flex justify-between items-center text-green-600">
+                  <span>Réduction totale:</span>
+                  <span>- {formatCurrencyCOP(order.total_discount)}</span>
+                </div>
+              )}
+              {order.applied_promotions && order.applied_promotions.length > 0 && (
+                <div className="mt-2">
+                  <p className="text-sm font-semibold text-green-700">Promotions appliquées:</p>
+                  {order.applied_promotions.map((promo, index) => (
+                    <div key={index} className="flex justify-between items-center text-xs text-green-600 ml-2">
+                      <span>- {promo.name}</span>
+                      <span>- {formatCurrencyCOP(promo.discount_amount)}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {order.shipping_cost !== undefined && order.shipping_cost > 0 && (
+                <div className="flex justify-between items-center text-gray-700">
+                  <span>Frais de livraison:</span>
+                  <span>{formatCurrencyCOP(order.shipping_cost)}</span>
+                </div>
+              )}
+              {order.shipping_cost === 0 && order.applied_promotions?.some(p => p.type === 'FREE_SHIPPING') && (
+                <div className="flex justify-between items-center text-green-600">
+                  <span>Livraison gratuite:</span>
+                  <span>{formatCurrencyCOP(0)}</span>
+                </div>
+              )}
+              <div className="flex justify-between items-center text-gray-900 font-bold text-xl border-t pt-2 mt-2">
+                <span>Total:</span>
+                <span>{formatCurrencyCOP(order.total)}</span>
+              </div>
+            </div>
+          </div>
 
           <button
             onClick={handleWhatsAppClick}

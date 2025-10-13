@@ -245,7 +245,8 @@ const OrderMenuView: React.FC<OrderMenuViewProps> = ({ onOrderSubmitted }) => {
 
     useEffect(() => {
         const calculateOrderTotals = async () => {
-            const initialSubtotal = cart.reduce((acc, item) => acc + item.quantite * item.prix_unitaire, 0);
+            const itemsWithoutDelivery = cart.filter(item => !isDeliveryFeeItem(item));
+            const initialSubtotal = itemsWithoutDelivery.reduce((acc, item) => acc + item.quantite * item.prix_unitaire, 0);
 
             if (cart.length === 0) {
                 setOrderTotals({
@@ -262,7 +263,7 @@ const OrderMenuView: React.FC<OrderMenuViewProps> = ({ onOrderSubmitted }) => {
 
             const tempOrder: Order = {
                 id: 'temp',
-                items: cart,
+                items: itemsWithoutDelivery,
                 subtotal: initialSubtotal,
                 total: initialSubtotal,
                 total_discount: 0,
@@ -271,7 +272,7 @@ const OrderMenuView: React.FC<OrderMenuViewProps> = ({ onOrderSubmitted }) => {
                 client_name: clientName,
                 client_phone: clientPhone,
                 client_address: clientAddress,
-                shipping_cost: DOMICILIO_FEE, // Assurez-vous que DOMICILIO_FEE est défini ou récupéré ailleurs
+                shipping_cost: deliveryFee,
                 order_type: orderType,
                 payment_method: paymentMethod,
                 status: 'pending',
@@ -323,7 +324,9 @@ const OrderMenuView: React.FC<OrderMenuViewProps> = ({ onOrderSubmitted }) => {
     const handleAddToCart = (item: OrderItem) => {
         setCart(prevCart => {
             const existingIndex = prevCart.findIndex(i => i.produitRef === item.produitRef);
-            if (existingIndex > -1) {
+            if (isDeliveryFeeItem(item)) {
+                return prevCart; // Prevent adding 'Domicilio' as a regular item
+            } else if (existingIndex > -1) {
                 const newCart = [...prevCart];
                 newCart[existingIndex] = { ...newCart[existingIndex], ...item };
                 return newCart;
@@ -388,7 +391,7 @@ const OrderMenuView: React.FC<OrderMenuViewProps> = ({ onOrderSubmitted }) => {
                 telephone: clientPhone,
                 adresse: clientAddress,
             },
-            shipping_cost: deliveryFee,
+            shipping_cost: orderTotals.deliveryFee,
             order_type: orderType,
             payment_method: paymentMethod,
             receipt_url: receiptUrl,

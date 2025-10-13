@@ -213,17 +213,14 @@ export const applyPromotionsToOrder = async (order: Order): Promise<Order> => {
   // Séparer les promotions en deux groupes
   // Groupe 1: Promotions qui s'appliquent en premier (2x1, happy_hour, codes promo)
   // Groupe 2: Promotions basées sur le total de la commande (percentage, fixed_amount, threshold, free_shipping)
-  const firstPassTypes: PromotionType[] = ['buy_x_get_y', 'happy_hour', 'promo_code'];
-  const secondPassTypes: PromotionType[] = ['percentage', 'fixed_amount', 'threshold', 'free_shipping'];
-
-  const firstPassPromotions = activePromotions
-    .filter(promo => firstPassTypes.includes(promo.type) && promo.type !== 'promo_code' && isPromotionApplicableToOrder(promo, mutableOrder))
-    .sort((a, b) => b.priority - a.priority);
-
   let currentSubtotal = mutableOrder.subtotal!;
 
-  // Passe 1: Appliquer les promotions de type 2x1, happy hour, etc.
-  for (const promo of firstPassPromotions) {
+  // 1. Appliquer les promotions 'Buy X Get Y' en premier
+  const buyXGetYPromotions = activePromotions
+    .filter(promo => promo.type === 'buy_x_get_y' && isPromotionApplicableToOrder(promo, mutableOrder))
+    .sort((a, b) => b.priority - a.priority);
+
+  for (const promo of buyXGetYPromotions) {
     const discount = calculatePromotionDiscount(promo, mutableOrder);
     if (discount > 0) {
       const cappedDiscount = Math.min(discount, currentSubtotal);
@@ -233,11 +230,12 @@ export const applyPromotionsToOrder = async (order: Order): Promise<Order> => {
         promotion_id: promo.id,
         name: promo.name,
         discount_amount: cappedDiscount,
+        config: promo.discount.buy_x_get_y_config, // Ajouter la config pour le suivi
       });
     }
   }
 
-  // Gestion du code promo s'il y en a un (appliqué après la passe 1)
+  // 2. Appliquer les codes promo
   if (order.promo_code) {
     const promoCodePromotion = await fetchPromotionByCode(order.promo_code);
 
@@ -251,20 +249,21 @@ export const applyPromotionsToOrder = async (order: Order): Promise<Order> => {
           promotion_id: promoCodePromotion.id,
           name: promoCodePromotion.name,
           discount_amount: cappedDiscount,
+          config: { promo_code: promoCodePromotion.discount.promo_code }, // Ajouter le code promo pour le suivi
         });
       }
     }
   }
 
-  // Mettre à jour le sous-total de la commande pour la passe 2
-  mutableOrder.subtotal = currentSubtotal;
-
-  // Passe 2: Appliquer les promotions basées sur le total de la commande
-  const secondPassPromotions = activePromotions
-    .filter(promo => secondPassTypes.includes(promo.type) && isPromotionApplicableToOrder(promo, mutableOrder))
+  // 3. Appliquer les promotions en pourcentage sur le total (et autres réductions générales)
+  const percentageAndFixedPromotions = activePromotions
+    .filter(promo =>
+      (promo.type === 'percentage' || promo.type === 'fixed_amount' || promo.type === 'threshold' || promo.type === 'happy_hour') &&
+      isPromotionApplicableToOrder(promo, mutableOrder)
+    )
     .sort((a, b) => b.priority - a.priority);
 
-  for (const promo of secondPassPromotions) {
+  for (const promo of percentageAndFixedPromotions) {
     const discount = calculatePromotionDiscount(promo, mutableOrder);
     if (discount > 0) {
       const cappedDiscount = Math.min(discount, currentSubtotal);
@@ -274,6 +273,24 @@ export const applyPromotionsToOrder = async (order: Order): Promise<Order> => {
         promotion_id: promo.id,
         name: promo.name,
         discount_amount: cappedDiscount,
+      });
+    }
+  }
+
+  // 4. Appliquer la promotion 'Domicilio Gratis' en dernier
+  const freeShippingPromotion = activePromotions
+    .find(promo => promo.type === 'free_shipping' && isPromotionApplicableToOrder(promo, mutableOrder));
+
+  if (freeShippingPromotion) {
+    const discount = calculatePromotionDiscount(freeShippingPromotion, mutableOrder);
+    if (discount > 0) {
+      // Les frais de livraison sont gérés séparément dans CommandeClient.tsx
+      // Ici, nous enregistrons juste la promotion appliquée.
+      mutableOrder.applied_promotions!.push({
+        promotion_id: freeShippingPromotion.id,
+        name: freeShippingPromotion.name,
+        discount_amount: discount,
+        type: 'FREE_SHIPPING', // Ajouter le type pour une meilleure identification
       });
     }
   }

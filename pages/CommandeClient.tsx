@@ -286,13 +286,15 @@ const OrderMenuView: React.FC<OrderMenuViewProps> = ({ onOrderSubmitted }) => {
             const automaticPromotionsDiscount = totalDiscount - currentPromoCodeDiscount;
 
             let deliveryFee = orderType === 'pedir_en_linea' ? DOMICILIO_FEE : 0;
-            const freeShipping = updatedOrder.applied_promotions.some(p => p.type === 'FREE_SHIPPING');
-            if (freeShipping) {
+            const freeShippingPromotionApplied = updatedOrder.applied_promotions.some(p => p.type === 'FREE_SHIPPING');
+            if (freeShippingPromotionApplied) {
                 deliveryFee = 0;
             }
-            setIsFreeShipping(freeShipping);
+            setIsFreeShipping(freeShippingPromotionApplied);
 
-            const finalTotal = initialSubtotal - totalDiscount + deliveryFee;
+            // Le total final doit être calculé en utilisant le total de updatedOrder
+            // qui a déjà pris en compte toutes les promotions sauf les frais de livraison
+            const finalTotal = updatedOrder.total + deliveryFee;
 
             setOrderTotals({
                 subtotal: initialSubtotal,

@@ -33,4 +33,12 @@ export default defineConfig({
       ...resolveSupabaseFallbackAlias(),
     },
   },
+  server: {
+    watch: {
+      ignored: ["**/node_modules/**"],
+    },
+  },
+  optimizeDeps: {
+    exclude: ["@supabase/supabase-js"],
+  },
 });

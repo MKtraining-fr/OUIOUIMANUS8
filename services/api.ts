@@ -463,7 +463,7 @@ const mapOrderRow = (row: SupabaseOrderRow): Order => {
     date_servido: toTimestamp(row.date_servido),
     payment_status: row.payment_status,
     items,
-    total: total ?? items.reduce((sum, item) => sum + item.prix_unitaire * item.quantite, 0),
+        total: total ?? 0,
     profit: profit,
     payment_method: row.payment_method ?? undefined,
     payment_receipt_url: row.payment_receipt_url ?? undefined,
@@ -478,10 +478,10 @@ const mapOrderRow = (row: SupabaseOrderRow): Order => {
     };
   }
 
-  order.subtotal = toNumber(row.subtotal);
-  order.total_discount = toNumber(row.total_discount);
+  order.subtotal = toNumber(row.subtotal) ?? 0;
+  order.total_discount = toNumber(row.total_discount) ?? 0;
   order.promo_code = row.promo_code ?? undefined;
-  order.applied_promotions = row.applied_promotions ? (typeof row.applied_promotions === 'string' ? JSON.parse(row.applied_promotions) : row.applied_promotions) : undefined;
+  order.applied_promotions = row.applied_promotions ? (typeof row.applied_promotions === 'string' ? JSON.parse(row.applied_promotions) : row.applied_promotions) : [];
 
   return order;
 };
@@ -1981,6 +1981,11 @@ export const api = {
         payment_method: paymentMethod,
         payment_receipt_url: receiptUrl ?? null,
         date_servido: nowIso,
+        total: order.total, // Assurez-vous que le total final est stocké
+        subtotal: order.subtotal, // Assurez-vous que le sous-total est stocké
+        total_discount: order.total_discount, // Assurez-vous que la réduction totale est stockée
+        promo_code: order.promo_code, // Assurez-vous que le code promo est stocké
+        applied_promotions: order.applied_promotions ? JSON.stringify(order.applied_promotions) : null, // Assurez-vous que les promotions appliquées sont stockées
       })
       .eq('id', orderId);
 
@@ -2022,7 +2027,7 @@ export const api = {
         estado_cocina: 'no_enviado',
         date_creation: nowIso,
         payment_status: 'unpaid',
-        total: orderData.items.reduce((sum, item) => sum + item.prix_unitaire * item.quantite, 0),
+                total: orderData.total ?? orderData.items.reduce((sum, item) => sum + item.prix_unitaire * item.quantite, 0),
         client_nom: orderData.clientInfo?.nom ?? null,
         client_telephone: orderData.clientInfo?.telephone ?? null,
         client_adresse: orderData.clientInfo?.adresse ?? null,
@@ -2030,7 +2035,7 @@ export const api = {
         subtotal: orderData.subtotal ?? null,
         total_discount: orderData.total_discount ?? null,
         promo_code: orderData.promo_code ?? null,
-        applied_promotions: orderData.applied_promotions ?? null,
+        applied_promotions: orderData.applied_promotions ? JSON.stringify(orderData.applied_promotions) : null,
       })
       .select("*")
       .single();

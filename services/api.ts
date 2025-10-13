@@ -118,6 +118,7 @@ type SupabaseOrderRow = {
   client_telephone: string | null;
   client_adresse: string | null;
   receipt_url: string | null;
+  shipping_cost: number | null;
   order_items: SupabaseOrderItemRow[] | null;
   promotions: any | null; // This column seems to be unused, but present in DB
   subtotal: number | null;
@@ -468,6 +469,7 @@ const mapOrderRow = (row: SupabaseOrderRow): Order => {
     payment_method: row.payment_method ?? undefined,
     payment_receipt_url: row.payment_receipt_url ?? undefined,
     receipt_url: row.receipt_url ?? undefined,
+    shipping_cost: toNumber(row.shipping_cost) ?? 0,
   };
 
   if (row.client_nom || row.client_telephone || row.client_adresse) {
@@ -2031,7 +2033,8 @@ export const api = {
         client_nom: orderData.clientInfo?.nom ?? null,
         client_telephone: orderData.clientInfo?.telephone ?? null,
         client_adresse: orderData.clientInfo?.adresse ?? null,
-        receipt_url: orderData.receipt_url ?? null,
+        receipt_url: order.receipt_url ?? null,
+        shipping_cost: order.shipping_cost ?? null,
         subtotal: orderData.subtotal ?? null,
         total_discount: orderData.total_discount ?? null,
         promo_code: orderData.promo_code ?? null,

@@ -22,10 +22,16 @@ const OrderConfirmationModal: React.FC<OrderConfirmationModalProps> = ({
   if (!isOpen || !order) return null;
 
   const generateWhatsAppMessage = (): string => {
-    const itemsText = order.items
-      .filter(item => !item.nom_produit?.toLowerCase().includes('domicilio'))
+    let itemsText = order.items
+      .filter(item => !item.nom_produit?.toLowerCase().includes("domicilio"))
       .map(item => `- ${item.quantite}x ${item.nom_produit} (${formatCurrencyCOP(item.prix_unitaire)})`)
-      .join('\n');
+      .join("\n");
+
+    if (order.shipping_cost !== undefined && order.shipping_cost > 0) {
+      itemsText += `\n- 1x Domicilio (${formatCurrencyCOP(order.shipping_cost)})`;
+    } else if (order.shipping_cost === 0 && order.order_type === 'pedir_en_linea') {
+      itemsText += `\n- 1x Domicilio (GRATIS)`;
+    }
     
     const totalText = `Total: ${formatCurrencyCOP(order.total)}`;
     const clientText = `Cliente: ${order.clientInfo?.nom} (${order.clientInfo?.telephone})\nDirección: ${order.clientInfo?.adresse}`;

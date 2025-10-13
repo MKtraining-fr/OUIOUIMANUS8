@@ -10,6 +10,7 @@ export type CategorizedOrderItems = {
 
 export interface OrderSummaryProps {
     categorizedItems: CategorizedOrderItems;
+    order: Order; // Ajout de l'objet Order complet
     total: number;
     onQuantityChange: (itemIndex: number, change: number) => void;
     onCommentChange: (itemIndex: number, newComment: string) => void;
@@ -20,7 +21,7 @@ export interface OrderSummaryProps {
     onOpenPayment: () => void;
     isSending: boolean;
     hasPending: boolean;
-    orderStatus: Order['estado_cocina'];
+    orderStatus: Order["estado_cocina"];
     editingCommentId: string | null;
 }
 
@@ -146,9 +147,33 @@ const OrderSummary: React.FC<OrderSummaryProps> = ({
                 )}
             </div>
             <div className="p-4 border-t space-y-4">
-                <div className="flex justify-between text-2xl font-semibold text-brand-secondary">
-                    <span>Total</span>
-                    <span>{formatCurrencyCOP(total)}</span>
+                <div className="space-y-2">
+                    <div className="flex justify-between text-gray-700">
+                        <span>Sous-total</span>
+                        <span>{formatCurrencyCOP(order.subtotal ?? 0)}</span>
+                    </div>
+                    {order.total_discount && order.total_discount > 0 && (
+                        <div className="flex justify-between text-green-600">
+                            <span>Réduction totale</span>
+                            <span>- {formatCurrencyCOP(order.total_discount)}</span>
+                        </div>
+                    )}
+                    {order.shipping_cost !== undefined && order.shipping_cost > 0 && (
+                        <div className="flex justify-between text-gray-700">
+                            <span>Frais de livraison</span>
+                            <span>{formatCurrencyCOP(order.shipping_cost)}</span>
+                        </div>
+                    )}
+                    {order.shipping_cost === 0 && order.applied_promotions?.some(p => p.type === 'FREE_SHIPPING') && (
+                        <div className="flex justify-between text-green-600">
+                            <span>Livraison gratuite</span>
+                            <span>{formatCurrencyCOP(0)}</span>
+                        </div>
+                    )}
+                    <div className="flex justify-between text-2xl font-semibold text-brand-secondary border-t pt-2 mt-2">
+                        <span>Total</span>
+                        <span>{formatCurrencyCOP(total)}</span>
+                    </div>
                 </div>
 
                 {orderStatus === 'listo' && (

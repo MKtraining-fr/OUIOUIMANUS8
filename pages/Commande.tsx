@@ -702,6 +702,7 @@ const Commande: React.FC = () => {
             {/* Order Summary Section */}
             <OrderSummary
                 categorizedItems={categorizedItems}
+                order={order}
                 total={order.total}
                 onQuantityChange={handleQuantityChange}
                 onCommentChange={handleCommentChange}
